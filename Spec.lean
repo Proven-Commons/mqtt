@@ -7,13 +7,15 @@
   proves exactly the statement written here. The `sorry` below is
   expected in this file only.
 
-  The statements use only the definitions in `Mqtt/Value.lean`,
+  The statements use the definitions in `Mqtt/Value.lean`,
   `Mqtt/Parse.lean`, and `Mqtt/Utf8.lean`, the code under proof
-  named in `bar.toml`. No definition of their own is needed, so
-  this project has no `Spec/Defs.lean`.
+  named in `bar.toml`, and the definitions in `Spec/Defs.lean`,
+  which are part of the specification: the rules a statement
+  holds the reader to are written there, from the standard.
 -/
 
 import Mqtt
+import Spec.Defs
 
 open Mqtt
 
@@ -66,18 +68,36 @@ Section 1.5.5 of the standard: "The encoded value MUST use the
 minimum number of bytes necessary to represent the value". -/
 
 /-- What the variable byte integer reader accepts is the
-    printer's writing of the value it returns, which is the
-    shortest one, followed by the bytes it returns; and the
-    value is below 2^28. So a longer writing of a value, such as
-    `[128, 0]` for 0, is refused. -/
+    printer's writing of the value it returns, followed by the
+    bytes it returns; and the value is below 2^28. So every
+    value has one writing the reader accepts. That this writing
+    is the shortest is `Spec.printVBI_length` and
+    `Spec.decVBI_length`. -/
 theorem Spec.decVBI_canonical (bs : List UInt8) (n : Nat) (r : List UInt8)
     (h : decVBI bs = some (n, r)) :
     n < 268435456 ∧ bs = printVBI n ++ r := sorry
 
+/-- The printer writes every value below 2^28 in
+    `Spec.vbiSize` bytes, the fewest that carry it: one byte
+    below 2^7, two below 2^14, three below 2^21, four below
+    2^28. -/
+theorem Spec.printVBI_length (n : Nat) (hn : n < 268435456) :
+    (printVBI n).length = Spec.vbiSize n := sorry
+
+/-- What the variable byte integer reader accepts uses exactly
+    `Spec.vbiSize` bytes for the value it returns, the fewest
+    that carry it, for every input. So a longer writing, such
+    as `[128, 0]` for 0 or `[128, 129, 0]` for 128, is refused
+    (section 1.5.5, [MQTT-1.5.5-1]). -/
+theorem Spec.decVBI_length (bs : List UInt8) (n : Nat) (r : List UInt8)
+    (h : decVBI bs = some (n, r)) :
+    bs.length = r.length + Spec.vbiSize n := sorry
+
 /-- Every packet the stream reader takes is a header byte, the
-    shortest writing of the body's length, and that many body
-    bytes, all standing in the input; the bytes it returns are
-    exactly the ones after them. -/
+    printer's writing of the body's length (the shortest, by
+    `Spec.printVBI_length`), and that many body bytes, all
+    standing in the input; the bytes it returns are exactly the
+    ones after them. -/
 theorem Spec.parsePacket_frame (bs : List UInt8) (p : Packet)
     (r : List UInt8) (h : parsePacket bs = some (p, r)) :
     ∃ (b : UInt8) (body : List UInt8), body.length < 268435456

@@ -2,15 +2,19 @@
   Proofs of the statements in `Spec.lean`, under the same names.
 
   The round trips are the theorems proved in
-  `Proofs/RoundTrip.lean`, and the soundness of the reader the
-  ones proved in `Proofs/Sound.lean`. The refusals are single inputs,
+  `Proofs/RoundTrip.lean`, the soundness of the reader the
+  ones proved in `Proofs/Sound.lean`, and the statements whose
+  rules stand in `Spec/Defs.lean` the ones proved in
+  `Proofs/Rules.lean`. The refusals are single inputs,
   checked in the kernel with `decide +kernel`: no native
   evaluation, which the bar forbids.
 -/
 
 import Mqtt
+import Spec.Defs
 import Proofs.RoundTrip
 import Proofs.Sound
+import Proofs.Rules
 
 open Mqtt
 
@@ -42,6 +46,15 @@ theorem Spec.decVBI_canonical (bs : List UInt8) (n : Nat) (r : List UInt8)
     (h : decVBI bs = some (n, r)) :
     n < 268435456 ∧ bs = printVBI n ++ r :=
   Mqtt.Proofs.decVBI_canonical bs n r h
+
+theorem Spec.printVBI_length (n : Nat) (hn : n < 268435456) :
+    (printVBI n).length = Spec.vbiSize n :=
+  Mqtt.Proofs.printVBI_length n hn
+
+theorem Spec.decVBI_length (bs : List UInt8) (n : Nat) (r : List UInt8)
+    (h : decVBI bs = some (n, r)) :
+    bs.length = r.length + Spec.vbiSize n :=
+  Mqtt.Proofs.decVBI_length bs n r h
 
 theorem Spec.parsePacket_frame (bs : List UInt8) (p : Packet)
     (r : List UInt8) (h : parsePacket bs = some (p, r)) :

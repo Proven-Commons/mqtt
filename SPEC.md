@@ -66,8 +66,13 @@ every variable byte integer in a packet: the remaining length,
 property lengths, property identifiers, and variable byte
 integer property values. It is proved for every input: what
 the reader accepts is exactly the printer's writing of the
-value it returns, and the packet reader takes exactly a header
-byte, the shortest writing of the body length, and the body.
+value it returns (`Spec.decVBI_canonical`), that writing uses
+the fewest bytes that carry the value, one byte below 2^7, two
+below 2^14, three below 2^21 and four below 2^28
+(`Spec.printVBI_length` and `Spec.decVBI_length`, with the
+count `Spec.vbiSize` written in `Spec/Defs.lean`), and the
+packet reader takes exactly a header byte, that writing of the
+body length, and the body (`Spec.parsePacket_frame`).
 
 Paho's Python library (paho-mqtt 2.1.0) accepts the longer
 writings, for example 128, 0 as 0. The test harness records
@@ -375,7 +380,8 @@ remaining length as a minimal variable byte integer, and the
 body in the layouts above. Property blocks are written with a
 minimal property length, and property identifiers and
 variable byte integer values in their minimal form, which is
-the only form the reader accepts. Every packet the reader
+the only form the reader accepts (`Spec.printVBI_length` and
+`Spec.decVBI_length`). Every packet the reader
 accepts reprints byte for byte: the printer's form is the
 only form the reader accepts.
 
@@ -430,8 +436,10 @@ rule on many more inputs.
 | Every packet the whole input reader accepts is well formed, and printing it gives back exactly the bytes it read; so the reader refuses every byte list that is not the printing of a well formed packet | `Spec.parse_sound` |
 | Every packet the stream reader takes is well formed, and the bytes it took are exactly its printing, followed by the bytes it returns | `Spec.parsePacket_sound` |
 | Reading a printed variable byte integer gives the number back, below 2^28 | `Spec.decVBI_printVBI` |
-| What the variable byte integer reader accepts is the printer's writing of the value it returns, the shortest one, so a longer writing is refused; the value is below 2^28 | `Spec.decVBI_canonical` |
-| Every packet the stream reader takes is a header byte, the shortest writing of the body length, and that many body bytes, all in the input; the bytes it returns are the ones after them | `Spec.parsePacket_frame` |
+| What the variable byte integer reader accepts is the printer's writing of the value it returns, followed by the bytes it returns; the value is below 2^28 | `Spec.decVBI_canonical` |
+| The printer writes every value below 2^28 in `Spec.vbiSize` bytes, the fewest that carry it | `Spec.printVBI_length` |
+| For every input, what the variable byte integer reader accepts uses exactly `Spec.vbiSize` bytes for its value, so a longer writing is refused | `Spec.decVBI_length` |
+| Every packet the stream reader takes is a header byte, the printer's writing of the body length (the shortest, by `Spec.printVBI_length`), and that many body bytes, all in the input; the bytes it returns are the ones after them | `Spec.parsePacket_frame` |
 | The remaining length 128, 0 (a two byte writing of 0) is refused, while 0 gives the PINGREQ | `Spec.rejects_non_minimal_remaining_length` |
 | A variable byte integer whose first four bytes all carry a continuation mark is refused, whatever follows | `Spec.decVBI_four_byte_cap` |
 | A packet whose remaining length has a continuation mark on each of its first four bytes is refused, whatever the header byte and whatever follows | `Spec.parsePacket_four_byte_cap` |
