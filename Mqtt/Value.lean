@@ -50,9 +50,10 @@ theorem writeBE_length : ∀ (k n : Nat), (writeBE k n).length = k
     seven bits per byte, low groups first, the top bit of each
     byte but the last set as a continuation mark. The format
     carries at most four bytes, so numbers below 2^28 are the
-    ones with a complete writing; a larger number loses its top
-    groups here, and the well formedness rules below keep every
-    written number under the bound. -/
+    ones it can carry. This function has no cap: a number of
+    2^28 or more gets a writing of five or more bytes, which
+    the reader refuses. The well formedness rules below keep
+    every written number under the bound. -/
 def printVBI (n : Nat) : List UInt8 :=
   if n < 128 then [n.toUInt8]
   else (128 + n % 128).toUInt8 :: printVBI (n / 128)
