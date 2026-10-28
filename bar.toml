@@ -1,0 +1,67 @@
+# Read by bar/check.py in Proven-Commons/mission.
+# See playbook/verified-bar.md there for what each field means.
+
+[project]
+name = "mqtt"
+# "in-progress" until every bar item passes, then "verified".
+status = "in-progress"
+page = "README.md"
+# GitHub handles of everyone who wrote the specification.
+spec_authors = ["abu-aska"]
+# The program people run. A change to it voids the approval.
+entry_points = ["Main.lean"]
+
+[spec]
+files = ["SPEC.md", "Spec.lean"]
+# The code under proof: the functions the statements are about.
+code = [
+  # The data types the statements are about, and their constructors.
+  "Mqtt.PropType", "Mqtt.PropVal", "Mqtt.PropVal.byte",
+  "Mqtt.PropVal.twoByte", "Mqtt.PropVal.fourByte", "Mqtt.PropVal.varByte",
+  "Mqtt.PropVal.utf8", "Mqtt.PropVal.utf8Pair", "Mqtt.PropVal.binary",
+  "Mqtt.Property", "Mqtt.PropSet", "Mqtt.SubOpts", "Mqtt.Will",
+  "Mqtt.Connect", "Mqtt.Publish", "Mqtt.Packet", "Mqtt.Packet.connect",
+  "Mqtt.Packet.publish", "Mqtt.Packet.subscribe", "Mqtt.Packet.suback",
+  "Mqtt.Packet.pingreq", "Mqtt.Packet.pingresp", "Mqtt.Packet.disconnect",
+  # The property table.
+  "Mqtt.valType", "Mqtt.propTypeOf", "Mqtt.allowedOf", "Mqtt.repeatableIn",
+  # The byte forms and the printer.
+  "Mqtt.writeBE", "Mqtt.printVBI", "Mqtt.printStr", "Mqtt.printBin",
+  "Mqtt.printPropVal", "Mqtt.printProperty", "Mqtt.printPropsList",
+  "Mqtt.printProps", "Mqtt.printOptsByte", "Mqtt.connectFlags",
+  "Mqtt.printWillPart", "Mqtt.printOptStr", "Mqtt.printOptBin",
+  "Mqtt.printConnectBody", "Mqtt.publishHeader", "Mqtt.printIdOpt",
+  "Mqtt.printPublishBody", "Mqtt.printFilter", "Mqtt.printFilters",
+  "Mqtt.printSubscribeBody", "Mqtt.printSubackBody", "Mqtt.bodyOf",
+  "Mqtt.headerOf", "Mqtt.print",
+  # Well formedness.
+  "Mqtt.hasNul", "Mqtt.StrWF", "Mqtt.BinWF", "Mqtt.TopicWF", "Mqtt.ValWF",
+  "Mqtt.PropsWF", "Mqtt.PropsBlockWF", "Mqtt.WillWF", "Mqtt.ConnectWF",
+  "Mqtt.PublishWF", "Mqtt.OptsWF", "Mqtt.FiltersWF", "Mqtt.PacketFieldsWF",
+  "Mqtt.PacketWF",
+  # The strict UTF-8 codec the string reader rests on.
+  "Mqtt.Utf8.encodeChar", "Mqtt.Utf8.encode", "Mqtt.Utf8.contVal",
+  "Mqtt.Utf8.decode",
+  # The length checked readers and the parser.
+  "Mqtt.readNat", "Mqtt.readBytes", "Mqtt.readByte", "Mqtt.decVBIGo",
+  "Mqtt.decVBI", "Mqtt.checkChars", "Mqtt.readStr", "Mqtt.readBin",
+  "Mqtt.readPropVal", "Mqtt.readEntry", "Mqtt.readEntriesGo",
+  "Mqtt.readEntries", "Mqtt.readProps", "Mqtt.readOptsByte",
+  "Mqtt.readFiltersGo", "Mqtt.flagBit", "Mqtt.checkTopic",
+  "Mqtt.readWillPart", "Mqtt.readOptStrField", "Mqtt.readOptBinField",
+  "Mqtt.readConnectBody", "Mqtt.readPacketId", "Mqtt.readPublishBody",
+  "Mqtt.readSubscribeBody", "Mqtt.readSubackBody", "Mqtt.readDisconnectBody",
+  "Mqtt.parseBody", "Mqtt.parsePacket", "Mqtt.parse",
+]
+
+# One entry per approval, added in a pull request the reviewer approves.
+# [[spec.approval]]
+# reviewer = "github-handle"
+# date = "2026-11-02"
+# sha256 = "..."
+# record = "https://github.com/Proven-Commons/mqtt/pull/<n>"
+
+[tests]
+results = "tests/TEST-RESULTS.md"
+command = "python3 tests/run_tests.py"
+files = ["tests/run_tests.py"]

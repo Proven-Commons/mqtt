@@ -328,3 +328,29 @@ The tool prints only the re-encoded bytes. It does not print
 a rendering of the packet, so test harnesses check the parsed
 structure through the re-encoding together with their own
 oracle.
+
+## Properties and their theorems
+
+Each property a reader can check in the page (`README.md`)
+names its theorem. The theorems are stated in `Spec.lean`
+and proved in `Proofs/SpecProofs.lean`. The refusal theorems
+are single inputs, one for each named rejection case in the
+test harness; the tests in `tests/` cover each rule on many
+more inputs.
+
+| Property | Theorem |
+|----------|---------|
+| Parsing the printed form of a well formed packet, with more stream bytes after it, gives the packet and those bytes back | `Spec.parsePacket_print` |
+| Parsing the printed form of a well formed packet on its own gives the packet back | `Spec.parse_print` |
+| Reading a printed variable byte integer gives the number back, below 2^28 | `Spec.decVBI_printVBI` |
+| A remaining length needing a fifth byte is refused | `Spec.rejects_five_byte_remaining_length` |
+| A SUBSCRIBE with flags other than 0010 is refused | `Spec.rejects_subscribe_flags` |
+| A PUBLISH with the reserved QoS value 3 is refused | `Spec.rejects_publish_qos3` |
+| A PUBLISH topic name holding a wildcard is refused | `Spec.rejects_wildcard_topic` |
+| A CONNECT with a protocol name other than `MQTT` is refused | `Spec.rejects_wrong_protocol_name` |
+| A CONNECT with the reserved connect flag bit set is refused | `Spec.rejects_reserved_connect_flag` |
+| A property on a packet type that does not allow it is refused | `Spec.rejects_property_wrong_type` |
+| A single use property standing twice in one block is refused | `Spec.rejects_repeated_property` |
+| A SUBSCRIBE with packet identifier 0 is refused | `Spec.rejects_subscribe_id_zero` |
+| A PINGREQ with a body is refused | `Spec.rejects_pingreq_body` |
+| A packet type outside the seven in this slice is refused | `Spec.rejects_unknown_type` |
