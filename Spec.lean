@@ -117,6 +117,14 @@ theorem Spec.rejects_publish_qos3 :
     (parse ([54, 7, 0, 1, 97, 0, 1, 0, 120] : List UInt8)).isSome
       = false := sorry
 
+/-- A PUBLISH with the DUP flag set at QoS 0 is refused (section
+    3.3.1.1, [MQTT-3.3.1-2]): the header byte 0x38. The same
+    packet with DUP clear, header 0x30, is accepted. -/
+theorem Spec.rejects_dup_at_qos0 :
+    (parse ([56, 4, 0, 1, 97, 0] : List UInt8)).isSome = false
+    ∧ parse ([48, 4, 0, 1, 97, 0] : List UInt8)
+      = some (.publish ⟨false, 0, false, ['a'], none, [], []⟩) := sorry
+
 /-- A PUBLISH topic name holding a wildcard is refused: `a/#` is
     a filter, not a topic name. -/
 theorem Spec.rejects_wildcard_topic :

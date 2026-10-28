@@ -83,7 +83,9 @@ PINGRESP, and DISCONNECT. Any other nibble is rejected.
 PUBLISH flags carry meaning and are part of the packet value:
 the DUP flag at bit 3, the QoS level at bits 2 and 1, and the
 RETAIN flag at bit 0. The QoS value 3 is reserved and is
-rejected.
+rejected. The DUP flag set at QoS 0 is rejected: "The DUP flag
+MUST be set to 0 for all QoS 0 messages [MQTT-3.3.1-2]"
+(section 3.3.1.1).
 
 ## Strings and binary data
 
@@ -318,9 +320,9 @@ fields the printer can write exactly. In outline:
 - CONNECT: the will, when one stands, has QoS at most 2, a
   well formed will property block, a topic that passes the
   topic name check, and a payload that fits its prefix.
-- PUBLISH: QoS at most 2; a topic that passes the topic name
-  check; a packet identifier standing exactly when the QoS is
-  1 or 2, and never 0.
+- PUBLISH: QoS at most 2; DUP clear at QoS 0; a topic that
+  passes the topic name check; a packet identifier standing
+  exactly when the QoS is 1 or 2, and never 0.
 - SUBSCRIBE: a nonzero packet identifier, a nonempty filter
   list, and options with QoS and retain handling at most 2.
 - SUBACK: a nonzero packet identifier and a nonempty reason
@@ -391,6 +393,7 @@ inputs.
 | A packet whose remaining length has a continuation mark on each of its first four bytes is refused, whatever the header byte and whatever follows | `Spec.parsePacket_four_byte_cap` |
 | A SUBSCRIBE with flags other than 0010 is refused | `Spec.rejects_subscribe_flags` |
 | A PUBLISH with the reserved QoS value 3 is refused | `Spec.rejects_publish_qos3` |
+| A PUBLISH with DUP set at QoS 0 is refused (example input: header 0x38), while the same packet with header 0x30 is accepted | `Spec.rejects_dup_at_qos0` |
 | A PUBLISH topic name holding a wildcard is refused | `Spec.rejects_wildcard_topic` |
 | A CONNECT with a protocol name other than `MQTT` is refused | `Spec.rejects_wrong_protocol_name` |
 | A CONNECT with the reserved connect flag bit set is refused | `Spec.rejects_reserved_connect_flag` |

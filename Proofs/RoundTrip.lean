@@ -1158,7 +1158,7 @@ theorem readPublishBody_printPublishBody (flags : Nat) (pub : Publish)
     (h0 : flagBit flags 0 = pub.retain) (h : PublishWF pub) :
     readPublishBody flags (printPublishBody pub) = some pub := by
   obtain ⟨dup, qos, retain, topic, pid, props, payload⟩ := pub
-  obtain ⟨hqos, htopic, hidf, hnone, hprops⟩ := h
+  obtain ⟨hqos, htopic, hidf, hnone, hprops, _⟩ := h
   have htopic' : TopicWF topic := htopic
   have hidf' : ∀ id, pid = some id →
       1 ≤ id ∧ id < 65536 ∧ (qos = 1 ∨ qos = 2) := hidf
@@ -1244,12 +1244,24 @@ theorem parseBody_publish (pub : Publish) (h : PublishWF pub) :
       = (if pub.dup then 8 else 0) + pub.qos * 2
         + (if pub.retain then 1 else 0) := by omega
   have hb := publish_bits pub.dup pub.retain pub.qos hqos
+  have hdupwf : pub.qos = 0 → pub.dup = false := h.2.2.2.2.2
+  have hdup : ¬ (((if pub.dup then 8 else 0) + pub.qos * 2
+      + (if pub.retain then 1 else 0)) / 2 % 4 = 0
+      ∧ flagBit ((if pub.dup then 8 else 0) + pub.qos * 2
+        + (if pub.retain then 1 else 0)) 3 = true) := by
+    rw [hb.1, hb.2.1]
+    intro hc
+    rw [hdupwf hc.1] at hc
+    cases hc.2
   show (if (publishHeader pub % 16 / 2) % 4 = 3 then none
+    else if (publishHeader pub % 16 / 2) % 4 = 0
+        ∧ flagBit (publishHeader pub % 16) 3 = true then none
     else (readPublishBody (publishHeader pub % 16) (printPublishBody pub)).map
       Packet.publish) = some (.publish pub)
   rw [hmod, if_neg (by rw [hb.1]; omega :
       ¬ ((if pub.dup then 8 else 0) + pub.qos * 2
         + (if pub.retain then 1 else 0)) / 2 % 4 = 3),
+    ite_eq_right hdup,
     readPublishBody_printPublishBody _ pub hb.1 hb.2.1 hb.2.2 h]
   simp only [Option.map_some]
 

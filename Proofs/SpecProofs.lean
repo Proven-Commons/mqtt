@@ -70,6 +70,13 @@ theorem Spec.rejects_publish_qos3 :
   decide +kernel
 
 
+theorem Spec.rejects_dup_at_qos0 :
+    (parse ([56, 4, 0, 1, 97, 0] : List UInt8)).isSome = false
+    ∧ parse ([48, 4, 0, 1, 97, 0] : List UInt8)
+      = some (.publish ⟨false, 0, false, ['a'], none, [], []⟩) := by
+  decide +kernel
+
+
 theorem Spec.rejects_wildcard_topic :
     (parse ([48, 7, 0, 3, 97, 47, 35, 0, 120] : List UInt8)).isSome
       = false := by

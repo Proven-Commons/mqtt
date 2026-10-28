@@ -428,6 +428,9 @@ def dec_publish(flags, seg):
     topic, i = dec_str(seg, 0)
     check_topic(topic)
     qos = (flags // 2) % 4
+    # DUP is 0 for all QoS 0 messages [MQTT-3.3.1-2].
+    if qos == 0 and flagbit(flags, 3):
+        raise Reject()
     pid = None
     if qos != 0:
         pid, i = dec_uint(seg, i, 2)
@@ -614,7 +617,10 @@ def rand_packet(rng):
                 rand_bytes(rng) if rng.random() < 0.4 else None)
     if tag == "publish":
         qos = rng.choice([0, 1, 2])
-        return ("publish", rng.random() < 0.5, qos, rng.random() < 0.5,
+        # DUP only at QoS 1 and 2: at QoS 0 it is a forbidden
+        # packet, which the named rejection cases cover.
+        return ("publish", qos != 0 and rng.random() < 0.5, qos,
+                rng.random() < 0.5,
                 rand_topic(rng),
                 rng.randint(1, 65535) if qos else None,
                 rand_props(rng, "publish"), rand_bytes(rng, 20))
@@ -933,6 +939,16 @@ def mutation_cases(rng):
                   raw_packet(0x80, sub_body), "none"))
     pub_body = enc_str("a") + be16(1) + b"\x00" + b"x"
     named.append(("publish qos 3", raw_packet(0x36, pub_body), "none"))
+    q0_body = enc_str("a") + b"\x00"
+    named.append(("publish dup at qos 0", raw_packet(0x38, q0_body), "none"))
+    named.append(("publish dup at qos 0 with retain",
+                  raw_packet(0x39, q0_body), "none"))
+    named.append(("publish qos 0, dup clear (control)",
+                  raw_packet(0x30, q0_body),
+                  want_ok(raw_packet(0x30, q0_body))))
+    named.append(("publish dup at qos 1 (control)",
+                  raw_packet(0x3A, pub_body),
+                  want_ok(raw_packet(0x3A, pub_body))))
     wild_body = enc_str("a/#") + b"\x00" + b"x"
     named.append(("publish wildcard topic",
                   raw_packet(0x30, wild_body), "none"))

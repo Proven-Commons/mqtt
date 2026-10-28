@@ -20,7 +20,8 @@
     rejected, and so is a fixed header flags nibble other than
     the one the specification fixes for the type; PUBLISH is
     the only type whose flags carry meaning, and its reserved
-    QoS value 3 is rejected.
+    QoS value 3 is rejected, as is the DUP flag at QoS 0
+    (section 3.3.1.1, [MQTT-3.3.1-2]).
   - The body of a packet is cut out by its remaining length
     first, and the type's reader must consume the cut exactly:
     bytes left over inside the cut are rejected, and a field
@@ -349,12 +350,14 @@ def readDisconnectBody (seg : List UInt8) : Option Packet :=
     The reader must consume the cut exactly. Packet types
     outside the seven this slice covers are rejected, and so
     is a flags nibble other than the one the specification
-    fixes for the type. -/
+    fixes for the type, and a PUBLISH flags nibble with QoS 3,
+    or with DUP set at QoS 0. -/
 def parseBody (typ flags : Nat) (seg : List UInt8) : Option Packet :=
   match typ with
   | 1 => if flags = 0 then (readConnectBody seg).map Packet.connect else none
   | 3 =>
     if (flags / 2) % 4 = 3 then none
+    else if (flags / 2) % 4 = 0 ∧ flagBit flags 3 = true then none
     else (readPublishBody flags seg).map Packet.publish
   | 8 => if flags = 2 then readSubscribeBody seg else none
   | 9 => if flags = 0 then readSubackBody seg else none

@@ -67,6 +67,7 @@ where they end in `sorry`) and proved in
 | A packet whose remaining length has a continuation mark on each of its first four bytes is refused, by the stream reader `parsePacket` and by the whole input reader `parse`, whatever the header byte and whatever follows. | `Spec.parsePacket_four_byte_cap` |
 | A SUBSCRIBE packet with flags 0000 is refused: the value the standard fixes is 0010. | `Spec.rejects_subscribe_flags` |
 | A PUBLISH packet with the reserved QoS value 3 is refused. | `Spec.rejects_publish_qos3` |
+| A PUBLISH with the DUP flag set at QoS 0 is refused: here the packet 56, 4, 0, 1, 97, 0 (header 0x38). The same packet with header 0x30 is accepted. | `Spec.rejects_dup_at_qos0` |
 | A PUBLISH topic name holding a wildcard is refused. | `Spec.rejects_wildcard_topic` |
 | A CONNECT whose protocol name is not `MQTT` is refused. | `Spec.rejects_wrong_protocol_name` |
 | A CONNECT with the reserved bit of the connect flags byte set is refused. | `Spec.rejects_reserved_connect_flag` |
@@ -86,7 +87,8 @@ the standard sets (no Subscription Identifier, Topic
 Alias, Receive Maximum or Maximum Packet Size of 0, and
 so on, as `SPEC.md` lists), and repeat no single use
 property, its packet identifiers stand where the
-type requires them and are never 0 there, and its whole
+type requires them and are never 0 there, a PUBLISH at
+QoS 0 has DUP clear, and its whole
 body is shorter than 2^28, the largest remaining length a
 variable byte integer can carry. The full list is in
 `SPEC.md`.

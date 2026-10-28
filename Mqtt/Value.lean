@@ -511,12 +511,15 @@ def ConnectWF (c : Connect) : Prop :=
     ∧ (∀ p, c.password = some p → BinWF p)
 
 /-- A PUBLISH packet fit to print. The packet identifier
-    stands exactly when the QoS is 1 or 2, and is never 0. -/
+    stands exactly when the QoS is 1 or 2, and is never 0. The
+    DUP flag is clear at QoS 0 (section 3.3.1.1,
+    [MQTT-3.3.1-2]). -/
 def PublishWF (p : Publish) : Prop :=
   p.qos ≤ 2 ∧ TopicWF p.topic
     ∧ (∀ id, p.packetId = some id → 1 ≤ id ∧ id < 65536 ∧ (p.qos = 1 ∨ p.qos = 2))
     ∧ (p.packetId = none → p.qos = 0)
     ∧ PropsBlockWF .publish p.props
+    ∧ (p.qos = 0 → p.dup = false)
 
 /-- Subscription options fit to print: the QoS and the retain
     handling choice are at most 2 (3 is reserved in both). -/
