@@ -1275,6 +1275,12 @@ def main():
                      "the strict oracle carried accept and reject "
                      "alone.")
     lines.append("")
+    lines.append("The plan's third oracle, MQTT 5.0 specification test "
+                 "material, was NOT used: the standard ships no "
+                 "conformance test suite, and the nearest material, the "
+                 "MQTTV5 codec in Eclipse paho.mqtt.testing, is not "
+                 "wired into this harness.")
+    lines.append("")
     if mosquitto:
         lines.append(f"A Mosquitto binary was found at {mosquitto}; "
                      "no Mosquitto test cases are wired into this "

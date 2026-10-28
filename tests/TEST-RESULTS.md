@@ -9,6 +9,8 @@ Tool: the Lean command line program, one process per section, requests batched. 
 
 Paho's Python library (`paho-mqtt`, version 2.1.0) was importable in the interpreter that ran this harness; the Paho cross-check ran. It covers variable byte integers and PUBLISH property blocks, the pieces the library exposes without a broker. Its inputs are listed below and are not part of Inputs.
 
+The plan's third oracle, MQTT 5.0 specification test material, was NOT used: the standard ships no conformance test suite, and the nearest material, the MQTTV5 codec in Eclipse paho.mqtt.testing, is not wired into this harness.
+
 Mosquitto was NOT present on this machine (no `mosquitto` or `mosquitto_sub` binary), so no Mosquitto tests ran.
 
 | Section | Inputs | Agreements |
