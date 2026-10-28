@@ -88,6 +88,14 @@ theorem Spec.rejects_reserved_connect_flag :
   decide +kernel
 
 
+theorem Spec.rejects_will_bits_without_will :
+    (parse ([16, 14, 0, 4, 77, 81, 84, 84, 5, 10, 0, 0, 0, 0, 1, 120]
+      : List UInt8)).isSome = false
+    ∧ (parse ([16, 14, 0, 4, 77, 81, 84, 84, 5, 34, 0, 0, 0, 0, 1, 120]
+      : List UInt8)).isSome = false := by
+  decide +kernel
+
+
 theorem Spec.rejects_property_wrong_type :
     (parse ([16, 16, 0, 4, 77, 81, 84, 84, 5, 2, 0, 0, 2, 11, 5, 0,
       1, 120] : List UInt8)).isSome = false := by

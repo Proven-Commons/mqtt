@@ -70,6 +70,7 @@ where they end in `sorry`) and proved in
 | A PUBLISH topic name holding a wildcard is refused. | `Spec.rejects_wildcard_topic` |
 | A CONNECT whose protocol name is not `MQTT` is refused. | `Spec.rejects_wrong_protocol_name` |
 | A CONNECT with the reserved bit of the connect flags byte set is refused. | `Spec.rejects_reserved_connect_flag` |
+| A CONNECT whose will flag is clear but whose will QoS or will retain bit is set is refused: here the connect flags 0x0A and 0x22 on an otherwise valid CONNECT. | `Spec.rejects_will_bits_without_will` |
 | A property standing on a packet type that does not allow it, here a subscription identifier on a CONNECT, is refused. | `Spec.rejects_property_wrong_type` |
 | A single use property standing twice in one block, here the topic alias on a PUBLISH, is refused. | `Spec.rejects_repeated_property` |
 | A SUBSCRIBE with packet identifier 0 is refused. | `Spec.rejects_subscribe_id_zero` |

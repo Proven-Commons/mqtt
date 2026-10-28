@@ -200,7 +200,10 @@ will flag at bit 2, clean start at bit 1, and a reserved bit
 at bit 0. The reader rejects a packet whose reserved bit is
 set, and rejects a will QoS field of 3. The will QoS and will
 retain bits are part of the packet value only when the will
-flag is set; when it is clear, the printer writes them as 0.
+flag is set. When it is clear, both must be 0 (sections
+3.1.2.6 [MQTT-3.1.2-11] and 3.1.2.7 [MQTT-3.1.2-13]): the
+reader rejects a packet with the will flag clear and any of
+bits 3, 4 or 5 set, and the printer writes them as 0.
 
 The payload is: the client identifier as a string field
 (always present, and it may be empty); then, when the will
@@ -391,6 +394,7 @@ inputs.
 | A PUBLISH topic name holding a wildcard is refused | `Spec.rejects_wildcard_topic` |
 | A CONNECT with a protocol name other than `MQTT` is refused | `Spec.rejects_wrong_protocol_name` |
 | A CONNECT with the reserved connect flag bit set is refused | `Spec.rejects_reserved_connect_flag` |
+| A CONNECT with the will flag clear and the will QoS or will retain bit set is refused (example inputs: connect flags 0x0A and 0x22) | `Spec.rejects_will_bits_without_will` |
 | A property on a packet type that does not allow it is refused | `Spec.rejects_property_wrong_type` |
 | A single use property standing twice in one block is refused | `Spec.rejects_repeated_property` |
 | A SUBSCRIBE with packet identifier 0 is refused | `Spec.rejects_subscribe_id_zero` |

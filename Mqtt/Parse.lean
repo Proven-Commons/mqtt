@@ -259,8 +259,11 @@ def readOptBinField (cond : Bool) (r : List UInt8) :
 /-- Read a CONNECT body: the whole body cut, nothing left
     over. The protocol name must be "MQTT" and the level 5. The
     reserved connect flag bit must be clear and the will QoS
-    must not be the reserved value 3. The payload fields stand
-    exactly when the connect flags say they stand. -/
+    must not be the reserved value 3. When the will flag is
+    clear, the will QoS and will retain bits must be clear too
+    (sections 3.1.2.6 [MQTT-3.1.2-11] and 3.1.2.7
+    [MQTT-3.1.2-13]). The payload fields stand exactly when the
+    connect flags say they stand. -/
 def readConnectBody (seg : List UInt8) : Option Connect :=
   (readStr seg).bind fun (proto, r1) =>
   if proto = ['M', 'Q', 'T', 'T'] then
@@ -269,6 +272,7 @@ def readConnectBody (seg : List UInt8) : Option Connect :=
       (readByte r2).bind fun (flags, r3) =>
       if flags % 2 = 0 then
       if (flags / 8) % 4 ≠ 3 then
+      if flagBit flags 2 || (flags / 8) % 8 = 0 then
         (readNat 2 r3).bind fun (ka, r4) =>
         (readProps .connect r4).bind fun (props, r5) =>
         (readStr r5).bind fun (cid, r6) =>
@@ -278,6 +282,7 @@ def readConnectBody (seg : List UInt8) : Option Connect :=
         if r9.isEmpty then
           some ⟨flagBit flags 1, ka, props, cid, will, username, password⟩
         else none
+      else none
       else none
       else none
     else none

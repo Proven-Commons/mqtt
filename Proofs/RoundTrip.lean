@@ -834,7 +834,8 @@ theorem connectFlags_facts (c : Connect) (h : ConnectWF c) :
     ∧ flagBit (connectFlags c) 5
         = (match c.will with | some w => w.retain | none => false)
     ∧ flagBit (connectFlags c) 2 = c.will.isSome
-    ∧ flagBit (connectFlags c) 1 = c.cleanStart := by
+    ∧ flagBit (connectFlags c) 1 = c.cleanStart
+    ∧ (c.will = none → (connectFlags c / 8) % 8 = 0) := by
   have e1 : (if c.username.isSome then (128 : Nat) else 0)
       = (if c.username.isSome then 1 else 0) * 128 := if_bool_mul _ _
   have e2 : (if c.password.isSome then (64 : Nat) else 0)
@@ -857,7 +858,7 @@ theorem connectFlags_facts (c : Connect) (h : ConnectWF c) :
       rw [e1, e2, e3, hw]
       dsimp only
       omega
-    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     · rw [hf]
       exact toNat_toUInt8 (by omega)
     · rw [hf]; omega
@@ -903,6 +904,8 @@ theorem connectFlags_facts (c : Connect) (h : ConnectWF c) :
             + (if c.cleanStart then 1 else 0) * 2) / 2 % 2
           = (if c.cleanStart then 1 else 0) by omega]
       cases h : c.cleanStart <;> rfl
+    · intro _
+      rw [hf]; omega
   | some w =>
     have hwf : WillWF w := h.2.2.2.1 w hw
     have hwq : w.qos ≤ 2 := hwf.1
@@ -919,7 +922,7 @@ theorem connectFlags_facts (c : Connect) (h : ConnectWF c) :
       rw [e1, e2, e3, hw]
       dsimp only
       rw [e4]
-    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     · rw [hf]
       exact toNat_toUInt8 (by omega)
     · rw [hf]; omega
@@ -971,6 +974,8 @@ theorem connectFlags_facts (c : Connect) (h : ConnectWF c) :
             + (if c.cleanStart then 1 else 0) * 2) / 2 % 2
           = (if c.cleanStart then 1 else 0) by omega]
       cases h : c.cleanStart <;> rfl
+    · intro hn
+      cases hn
 
 /-- The CONNECT tail: the optional username and password
     fields read back as themselves, and nothing is left
@@ -1038,7 +1043,7 @@ theorem readOptFields (u : Option (List Char)) (p : Option (List UInt8))
 theorem readConnectBody_printConnectBody (c : Connect) (h : ConnectWF c) :
     readConnectBody (printConnectBody c) = some c := by
   obtain ⟨hka, hprops, hcid, hwill, huser, hpass⟩ := h
-  obtain ⟨hf1, hf2, hf3, hf4, hf5, hf6, hf7, hf8⟩ := connectFlags_facts c
+  obtain ⟨hf1, hf2, hf3, hf4, hf5, hf6, hf7, hf8, hf9⟩ := connectFlags_facts c
     ⟨hka, hprops, hcid, hwill, huser, hpass⟩
   have hfin : ∀ (w : Option Will), w = c.will →
       (⟨c.cleanStart, c.keepAlive, c.props, c.clientId, w, c.username,
@@ -1070,6 +1075,8 @@ theorem readConnectBody_printConnectBody (c : Connect) (h : ConnectWF c) :
   · have hf3' : (connectFlags c / 8) % 4 = 0 := by rw [hf3, hwn]
     have hf7' : flagBit (connectFlags c) 2 = false := by simp [hf7, hwn]
     rw [if_pos (by rw [hf3']; omega : (connectFlags c / 8) % 4 ≠ 3),
+      ite_eq_left (by rw [hf9 hwn]; simp :
+        (flagBit (connectFlags c) 2 || decide ((connectFlags c / 8) % 8 = 0)) = true),
       readNat_writeBE 2 c.keepAlive _ (by omega)]
     simp only [Option.bind_some]
     rw [readProps_printProps .connect c.props _ hprops]
@@ -1098,6 +1105,8 @@ theorem readConnectBody_printConnectBody (c : Connect) (h : ConnectWF c) :
     have hf6' : flagBit (connectFlags c) 5 = wr := by rw [hf6, hw]
     have hf7' : flagBit (connectFlags c) 2 = true := by simp [hf7, hw]
     rw [if_pos (by rw [hf3']; omega : (connectFlags c / 8) % 4 ≠ 3),
+      ite_eq_left (by rw [hf7']; rfl :
+        (flagBit (connectFlags c) 2 || decide ((connectFlags c / 8) % 8 = 0)) = true),
       readNat_writeBE 2 c.keepAlive _ (by omega)]
     simp only [Option.bind_some]
     rw [readProps_printProps .connect c.props _ hprops]

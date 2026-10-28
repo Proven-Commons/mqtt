@@ -134,6 +134,18 @@ theorem Spec.rejects_reserved_connect_flag :
     (parse ([16, 14, 0, 4, 77, 81, 84, 84, 5, 3, 0, 0, 0, 0, 1, 120]
       : List UInt8)).isSome = false := sorry
 
+/-- A CONNECT whose will flag is clear but whose will QoS or will
+    retain bit is set is refused (sections 3.1.2.6
+    [MQTT-3.1.2-11] and 3.1.2.7 [MQTT-3.1.2-13]): here the
+    connect flags 0x0A (will QoS 1) and 0x22 (will retain). With
+    the flags 0x02 the same bytes are the CONNECT of
+    `Mqtt.Examples.parse_connect`. -/
+theorem Spec.rejects_will_bits_without_will :
+    (parse ([16, 14, 0, 4, 77, 81, 84, 84, 5, 10, 0, 0, 0, 0, 1, 120]
+      : List UInt8)).isSome = false
+    ∧ (parse ([16, 14, 0, 4, 77, 81, 84, 84, 5, 34, 0, 0, 0, 0, 1, 120]
+      : List UInt8)).isSome = false := sorry
+
 /-- A property standing on a packet type that does not allow it
     is refused: here a subscription identifier on a CONNECT. -/
 theorem Spec.rejects_property_wrong_type :

@@ -398,6 +398,10 @@ def dec_connect(seg):
     flags, i = dec_uint(seg, i, 1)
     if flags % 2 != 0 or (flags // 8) % 4 == 3:
         raise Reject()
+    # With the will flag clear, will QoS and will retain are 0
+    # [MQTT-3.1.2-11] [MQTT-3.1.2-13].
+    if not flagbit(flags, 2) and (flags & 0x38) != 0:
+        raise Reject()
     ka, i = dec_uint(seg, i, 2)
     props, i = dec_props("connect", seg, i)
     cid, i = dec_str(seg, i)
@@ -945,6 +949,16 @@ def mutation_cases(rng):
                + b"\x00" + enc_str("x") + b"\x00" + enc_str("w")
                + enc_bin(b""))
     named.append(("connect will qos 3", raw_packet(0x10, willqos), "none"))
+    plain_tail = be16(0) + b"\x00" + enc_str("x")
+    for flags, label in ((0x0A, "will qos 1 without the will flag"),
+                         (0x12, "will qos 2 without the will flag"),
+                         (0x22, "will retain without the will flag"),
+                         (0x3A, "will qos and retain without the will flag")):
+        named.append(("connect " + label,
+                      raw_packet(0x10, enc_str("MQTT") + bytes([5, flags])
+                                 + plain_tail), "none"))
+    plain = raw_packet(0x10, enc_str("MQTT") + bytes([5, 0x02]) + plain_tail)
+    named.append(("connect flags 0x02 (control)", plain, want_ok(plain)))
     wrong_prop = (enc_str("MQTT") + bytes([5, 2]) + be16(0)
                   + enc_props([(0x0B, 5)]) + enc_str("x"))
     named.append(("subscription identifier on connect",
