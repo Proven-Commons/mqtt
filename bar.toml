@@ -24,6 +24,16 @@ code = [
   "Mqtt.Publish.mk", "Mqtt.Packet", "Mqtt.Packet.connect",
   "Mqtt.Packet.publish", "Mqtt.Packet.subscribe", "Mqtt.Packet.suback",
   "Mqtt.Packet.pingreq", "Mqtt.Packet.pingresp", "Mqtt.Packet.disconnect",
+  # The fields, constructors and match recursors of those types that
+  # the rules in Spec/Defs.lean read.
+  "Mqtt.Property.id", "Mqtt.Property.val", "Mqtt.PropVal.rec",
+  "Mqtt.PropVal.ctorIdx", "Mqtt.PropSet.connect", "Mqtt.PropSet.will",
+  "Mqtt.PropSet.publish", "Mqtt.PropSet.subscribe", "Mqtt.PropSet.suback",
+  "Mqtt.PropSet.disconnect", "Mqtt.PropSet.casesOn", "Mqtt.Connect.props",
+  "Mqtt.Connect.will", "Mqtt.Will.props", "Mqtt.Will.topic",
+  "Mqtt.Publish.topic", "Mqtt.Publish.qos", "Mqtt.Publish.packetId",
+  "Mqtt.Publish.props", "Mqtt.SubOpts.noLocal", "Mqtt.Packet.rec",
+  "Mqtt.Packet.ctorIdx",
   # The property table.
   "Mqtt.valType", "Mqtt.propTypeOf", "Mqtt.allowedOf", "Mqtt.repeatableIn",
   # The byte forms and the printer.

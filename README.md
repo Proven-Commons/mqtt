@@ -57,8 +57,11 @@ where they end in `sorry`) and proved in
 `comparator.json` lists all of them. A claim that names
 its input, or says "one example input", is a theorem
 about that input alone, which a reader can check by
-evaluation; the paragraph after the table says how the
-rule it illustrates holds for every input.
+evaluation; the rule it illustrates is stated for every
+input by the theorem it names after "every input". The
+rules those theorems state are written in
+`Spec/Defs.lean`, one of the spec files an approval
+covers.
 
 | Claim | Theorem |
 |-------|---------|
@@ -71,25 +74,32 @@ rule it illustrates holds for every input.
 | The printer writes every value below 2^28 in `Spec.vbiSize` bytes, the fewest that carry it: one byte below 2^7, two below 2^14, three below 2^21, four below 2^28 (`Spec.vbiSize` is written in `Spec/Defs.lean`). | `Spec.printVBI_length` |
 | For every input, what `decVBI` accepts uses exactly `Spec.vbiSize` bytes for the value it returns. So a writing longer than the value needs, such as 128, 0 for 0 or 128, 129, 0 for 128, is refused (section 1.5.5, MQTT-1.5.5-1). | `Spec.decVBI_length` |
 | Every packet the stream reader `parsePacket` takes is a header byte, the printer's writing of the body length (the shortest, by the row above), and that many body bytes, all standing in the input; the bytes it returns are exactly the ones after them. | `Spec.parsePacket_frame` |
-| The packet 192, 128, 0 (a PINGREQ whose remaining length 0 is written in two bytes) is refused, while 192, 0 is the PINGREQ. | `Spec.rejects_non_minimal_remaining_length` |
+| The packet 192, 128, 0 (a PINGREQ whose remaining length 0 is written in two bytes) is refused, while 192, 0 is the PINGREQ (every input: `Spec.decVBI_length` with `Spec.parsePacket_frame`). | `Spec.rejects_non_minimal_remaining_length` |
 | The variable byte integer reader `decVBI` refuses every input whose first four bytes all carry a continuation mark, whatever follows: the value would need a fifth byte, and four is the limit. | `Spec.decVBI_four_byte_cap` |
 | A packet whose remaining length has a continuation mark on each of its first four bytes is refused, by the stream reader `parsePacket` and by the whole input reader `parse`, whatever the header byte and whatever follows. | `Spec.parsePacket_four_byte_cap` |
-| The SUBSCRIBE 128, 7, 0, 1, 0, 0, 1, 97, 0, whose flags are 0000 rather than the 0010 the standard fixes, is refused (one example input). | `Spec.rejects_subscribe_flags` |
-| A PUBLISH with the reserved QoS value 3 is refused (one example input, header 0x36). | `Spec.rejects_publish_qos3` |
-| A PUBLISH with the DUP flag set at QoS 0 is refused: here the packet 56, 4, 0, 1, 97, 0 (header 0x38). The same packet with header 0x30 is accepted. | `Spec.rejects_dup_at_qos0` |
-| A PUBLISH with an empty topic name and a Topic Alias (here 48, 6, 0, 0, 3, 35, 0, 1, alias 1) is accepted, and the same packet with no Topic Alias (48, 3, 0, 0, 0) is refused. | `Spec.empty_topic_needs_alias` |
-| A PUBLISH whose topic name is `a/#` is refused (one example input). | `Spec.rejects_wildcard_topic` |
-| A CONNECT whose protocol name is `MQTU`, not `MQTT`, is refused (one example input). | `Spec.rejects_wrong_protocol_name` |
-| A CONNECT whose connect flags byte is 0x03, with the reserved bit 0 set, is refused (one example input). | `Spec.rejects_reserved_connect_flag` |
-| A CONNECT whose will flag is clear but whose will QoS or will retain bit is set is refused: here the connect flags 0x0A and 0x22 on an otherwise valid CONNECT. | `Spec.rejects_will_bits_without_will` |
-| A CONNECT carrying a Subscription Identifier, which its property block does not allow, is refused (one example input). | `Spec.rejects_property_wrong_type` |
-| A PUBLISH carrying the single use Topic Alias twice is refused (one example input). | `Spec.rejects_repeated_property` |
-| SUBSCRIBE topic filters that break the standard's filter rules are refused, one example input each: `a/#/b` (`#` not last), `a+` (`+` not alone in its level), the empty filter, `$share/g/t` with No Local set, and `$share/g` (no filter after the ShareName). The filters `a/+/#` and `$share/g/t` with No Local clear are accepted. | `Spec.rejects_bad_topic_filters` |
-| A SUBSCRIBE with packet identifier 0 is refused (one example input). | `Spec.rejects_subscribe_id_zero` |
-| Property values the standard calls a Protocol Error are refused, one example input each: a Subscription Identifier of 0 on a SUBSCRIBE, a Topic Alias of 0 on a PUBLISH, a Receive Maximum of 0, a Maximum Packet Size of 0, a Request Problem Information of 2, a Request Response Information of 2, and Authentication Data with no Authentication Method on a CONNECT, and a Response Topic `#` and an empty Response Topic on a PUBLISH. | `Spec.rejects_property_value_rules` |
+| The whole input reader `parse` accepts a byte list, and returns a packet, exactly when the stream reader `parsePacket` takes that packet from it and leaves no byte after it. So each rule below, stated for `parsePacket`, holds for `parse` too. | `Spec.parse_whole` |
+| For every input, each packet `parsePacket` takes starts with one of the sixteen header bytes of `Spec.headerBytes`: 0x10, 0x30 to 0x35, 0x3A to 0x3D, 0x82, 0x90, 0xC0, 0xD0 and 0xE0. So a SUBSCRIBE whose flags are not 0010, another type whose flags are not 0000, a PUBLISH with QoS 3 or with DUP set at QoS 0, and every packet type outside the seven of this slice are refused. | `Spec.header_rule` |
+| For every input, each CONNECT `parsePacket` takes is the byte 0x10, the body length, and a body that starts with the protocol name `MQTT` (0, 4, 77, 81, 84, 84), the level 5, and a connect flags byte that keeps `Spec.ConnectFlagsRule`: the reserved bit 0 clear, a will QoS other than 3, and, when the will flag is clear, the will QoS and will retain bits clear. A will topic is not empty and holds no `+` or `#`. | `Spec.connect_rule` |
+| For every input, each PUBLISH `parsePacket` takes has a topic name with no `+` or `#`, which is empty only when its properties carry a Topic Alias; its packet identifier stands exactly when the QoS is not 0, and is never 0. | `Spec.publish_rule` |
+| For every input, each SUBSCRIBE `parsePacket` takes has a packet identifier other than 0 and at least one topic filter, and each filter keeps `Spec.FilterRule`. A filter is not empty; split at each `/`, a level that holds `+` is `+` alone, and a level that holds `#` is `#` alone and the last level. A filter that starts with `$share/` has a ShareName of at least one character with no `/`, `+` or `#`, then a `/` and a filter that keeps those rules, and its No Local option is clear. | `Spec.subscribe_rule` |
+| For every input, every property block of every packet `parsePacket` takes keeps `Spec.BlockRule`. Each property is allowed on its block (Table 2-4) and has its identifier's value type. Each value keeps the value rules: no Subscription Identifier, Topic Alias, Receive Maximum or Maximum Packet Size of 0, a Request Problem Information and Request Response Information of 0 or 1, and a Response Topic that is not empty and holds no `+` or `#`. No single use property repeats in a block, and Authentication Data stands only with an Authentication Method. | `Spec.property_rule` |
+| For every input, each PINGREQ `parsePacket` takes is the two bytes 192, 0, and each PINGRESP the two bytes 208, 0. | `Spec.empty_body_rule` |
+| The SUBSCRIBE 128, 7, 0, 1, 0, 0, 1, 97, 0, whose flags are 0000 rather than the 0010 the standard fixes, is refused (one example input; every input: `Spec.header_rule`). | `Spec.rejects_subscribe_flags` |
+| A PUBLISH with the reserved QoS value 3 is refused (one example input, header 0x36; every input: `Spec.header_rule`). | `Spec.rejects_publish_qos3` |
+| A PUBLISH with the DUP flag set at QoS 0 is refused: here the packet 56, 4, 0, 1, 97, 0 (header 0x38). The same packet with header 0x30 is accepted (every input: `Spec.header_rule`). | `Spec.rejects_dup_at_qos0` |
+| A PUBLISH with an empty topic name and a Topic Alias (here 48, 6, 0, 0, 3, 35, 0, 1, alias 1) is accepted, and the same packet with no Topic Alias (48, 3, 0, 0, 0) is refused (every input: `Spec.publish_rule`). | `Spec.empty_topic_needs_alias` |
+| A PUBLISH whose topic name is `a/#` is refused (one example input; every input: `Spec.publish_rule`). | `Spec.rejects_wildcard_topic` |
+| A CONNECT whose protocol name is `MQTU`, not `MQTT`, is refused (one example input; every input: `Spec.connect_rule`). | `Spec.rejects_wrong_protocol_name` |
+| A CONNECT whose connect flags byte is 0x03, with the reserved bit 0 set, is refused (one example input; every input: `Spec.connect_rule`). | `Spec.rejects_reserved_connect_flag` |
+| A CONNECT whose will flag is clear but whose will QoS or will retain bit is set is refused: here the connect flags 0x0A and 0x22 on an otherwise valid CONNECT (every input: `Spec.connect_rule`). | `Spec.rejects_will_bits_without_will` |
+| A CONNECT carrying a Subscription Identifier, which its property block does not allow, is refused (one example input; every input: `Spec.property_rule`). | `Spec.rejects_property_wrong_type` |
+| A PUBLISH carrying the single use Topic Alias twice is refused (one example input; every input: `Spec.property_rule`). | `Spec.rejects_repeated_property` |
+| SUBSCRIBE topic filters that break the standard's filter rules are refused, one example input each: `a/#/b` (`#` not last), `a+` (`+` not alone in its level), the empty filter, `$share/g/t` with No Local set, and `$share/g` (no filter after the ShareName). The filters `a/+/#` and `$share/g/t` with No Local clear are accepted (every input: `Spec.subscribe_rule`). | `Spec.rejects_bad_topic_filters` |
+| A SUBSCRIBE with packet identifier 0 is refused (one example input; every input: `Spec.subscribe_rule`). | `Spec.rejects_subscribe_id_zero` |
+| Property values the standard calls a Protocol Error are refused, one example input each: a Subscription Identifier of 0 on a SUBSCRIBE, a Topic Alias of 0 on a PUBLISH, a Receive Maximum of 0, a Maximum Packet Size of 0, a Request Problem Information of 2, a Request Response Information of 2, and Authentication Data with no Authentication Method on a CONNECT, and a Response Topic `#` and an empty Response Topic on a PUBLISH (every input: `Spec.property_rule`). | `Spec.rejects_property_value_rules` |
 | The DISCONNECT 224, 1, 0 (a reason code with no property block) reads as that form and prints back as the same three bytes, and the DISCONNECT 224, 2, 0, 0 (a reason code and an empty property block) reads as that form and prints back as the same four bytes. | `Spec.disconnect_short_form` |
-| The PINGREQ 192, 1, 0, which carries a one byte body, is refused (one example input). | `Spec.rejects_pingreq_body` |
-| The packet 32, 0, of type 2, outside the seven in this slice, is refused (one example input). | `Spec.rejects_unknown_type` |
+| The PINGREQ 192, 1, 0, which carries a one byte body, is refused (one example input; every input: `Spec.empty_body_rule`). | `Spec.rejects_pingreq_body` |
+| The packet 32, 0, of type 2, outside the seven in this slice, is refused (one example input; every input: `Spec.header_rule`). | `Spec.rejects_unknown_type` |
 
 A packet is well formed when its numbers fit the widths
 that carry them, its strings obey the string rules and fit
@@ -105,18 +115,14 @@ wildcard and is empty only beside a Topic Alias, its
 SUBSCRIBE topic filters keep the filter rules, and its
 whole body is shorter than 2^28, the largest remaining
 length a variable byte integer can carry. The full list is in
-`SPEC.md`.
-
-Because of `Spec.parse_sound`, each refusal rule the
-table illustrates with one example input holds for every
-input: an accepted input is the printing of a well formed
-packet, and no well formed packet prints with, say, a
-SUBSCRIBE flags nibble other than 0010, a DUP flag at QoS
-0, a Topic Alias of 0 or a topic filter `a/#/b`. Seeing
-that a given rule follows takes reading the well
-formedness rules and the printer in `Mqtt/Value.lean`,
-which `SPEC.md` describes; the rule is not restated as a
-theorem of its own.
+`SPEC.md`. Well formedness is `Mqtt.PacketWF` in
+`Mqtt/Value.lean`, which is code under proof: an approval
+pins the statements that use it, not its text. So each
+rule a claim above depends on is also written in
+`Spec/Defs.lean`, part of the specification, and proved
+for every input from there (`Spec.header_rule` through
+`Spec.empty_body_rule`). The well formedness rules with
+no such statement are listed under What is not proved.
 
 The round trip theorems rest on the proofs in
 `Proofs/RoundTrip.lean`, where they are
@@ -127,6 +133,10 @@ rest on `Proofs/Sound.lean`, where they are
 built from one inverse lemma per field reader, and on the
 inverse of the strict UTF-8 decoder,
 `Mqtt.Utf8.Proofs.decode_inv` in `Proofs/Utf8Inv.lean`.
+The rule theorems, and the byte count of a variable byte
+integer, rest on `Proofs/Rules.lean`, which derives each
+rule in `Spec/Defs.lean` from what the soundness theorems
+say the reader accepts.
 All of them check against the standard axioms only
 (`propext`, `Classical.choice`, `Quot.sound`), which a
 reader can confirm with `#print axioms`, or by running
@@ -158,14 +168,35 @@ are about.
   reviewer checks it against the standard, and the oracle
   differential and the mutation tests in `tests/` probe it,
   with the outcome in the results file. It is not proved.
+- Where each field sits in the bytes. The rules in
+  `Spec/Defs.lean` are stated on the header byte, on the
+  start of a CONNECT body, and on the fields of the packet
+  the reader returns. The round trip and soundness theorems
+  tie those fields to the bytes through the printer,
+  `Mqtt.print`, whose text is code under proof; beyond the
+  example inputs, no statement fixes the layout byte by
+  byte.
+- The well formedness rules that `Spec/Defs.lean` does not
+  restate. The reader keeps them on every input
+  (`Spec.parse_sound`), but they are written only in
+  `Mqtt/Value.lean` and `Mqtt/Parse.lean`, code under proof
+  whose text an approval does not pin. They are: the string
+  rules (strict UTF-8, no U+0000, at most 65535 bytes) and
+  the binary length limit; the subscription options byte
+  (bits 6 and 7 clear, QoS and Retain Handling not 3); the
+  will QoS of 2 at most as a field; a SUBACK with a packet
+  identifier other than 0 and at least one reason code;
+  and the three DISCONNECT body forms. The tests in
+  `tests/` check them, and the example theorems in
+  `Proofs/Examples.lean` check some on single inputs.
 - Any reading of what a property means. A property is an
   identifier and a typed value; that a Receive Maximum of
   10 asks the peer to hold back after ten packets is broker
   and session behaviour, and none of it is in this slice.
 - Anything about packets outside the seven types, or
   property identifiers outside the table in `SPEC.md`,
-  beyond their refusal, which follows from
-  `Spec.parse_sound`.
+  beyond their refusal (`Spec.header_rule` and
+  `Spec.property_rule`).
 - Broker or session behaviour of any kind: connections,
   subscriptions as state, retained messages, keep alive
   timing, and what any peer does with a packet.

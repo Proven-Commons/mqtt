@@ -5,7 +5,7 @@
   `Proofs/RoundTrip.lean`, the soundness of the reader the
   ones proved in `Proofs/Sound.lean`, and the statements whose
   rules stand in `Spec/Defs.lean` the ones proved in
-  `Proofs/Rules.lean`. The refusals are single inputs,
+  `Proofs/Rules.lean`. The example refusals are single inputs,
   checked in the kernel with `decide +kernel`: no native
   evaluation, which the bar forbids.
 -/
@@ -81,6 +81,44 @@ theorem Spec.parsePacket_four_byte_cap (h b0 b1 b2 b3 : UInt8)
       ∧ parse (h :: b0 :: b1 :: b2 :: b3 :: rest) = none :=
   Mqtt.Proofs.parsePacket_four_byte_cap h b0 b1 b2 b3 rest h0 h1 h2 h3
 
+theorem Spec.parse_whole (bs : List UInt8) (p : Packet) :
+    parse bs = some p ↔ parsePacket bs = some (p, []) :=
+  Mqtt.Proofs.parse_iff bs p
+
+theorem Spec.header_rule (bs : List UInt8) (p : Packet) (r : List UInt8)
+    (h : parsePacket bs = some (p, r)) :
+    ∃ (b : UInt8) (tl : List UInt8), bs = b :: tl ∧ b ∈ Spec.headerBytes :=
+  Mqtt.Proofs.header_rule bs p r h
+
+theorem Spec.connect_rule (bs r : List UInt8) (c : Connect)
+    (h : parsePacket bs = some (.connect c, r)) :
+    (∃ (f : UInt8) (tail : List UInt8),
+      bs = 16 :: (printVBI (8 + tail.length) ++ ([0, 4, 77, 81, 84, 84, 5, f] ++ tail)) ++ r
+      ∧ Spec.ConnectFlagsRule f.toNat)
+    ∧ ∀ w, c.will = some w → w.topic ≠ [] ∧ Spec.TopicNameRule w.topic :=
+  Mqtt.Proofs.connect_rule bs r c h
+
+theorem Spec.publish_rule (bs r : List UInt8) (m : Publish)
+    (h : parsePacket bs = some (.publish m, r)) :
+    Spec.TopicNameRule m.topic ∧ (m.topic = [] → ∃ q ∈ m.props, q.id = 0x23)
+    ∧ (m.packetId = none ↔ m.qos = 0) ∧ (∀ i, m.packetId = some i → i ≠ 0) :=
+  Mqtt.Proofs.publish_rule bs r m h
+
+theorem Spec.subscribe_rule (bs r : List UInt8) (i : Nat) (ps : List Property)
+    (fs : List (List Char × SubOpts))
+    (h : parsePacket bs = some (.subscribe i ps fs, r)) :
+    i ≠ 0 ∧ fs ≠ [] ∧ ∀ fo ∈ fs, Spec.FilterRule fo.1 fo.2 :=
+  Mqtt.Proofs.subscribe_rule bs r i ps fs h
+
+theorem Spec.property_rule (bs : List UInt8) (p : Packet) (r : List UInt8)
+    (h : parsePacket bs = some (p, r)) :
+    ∀ b ∈ Spec.blocks p, Spec.BlockRule b.1 b.2 :=
+  Mqtt.Proofs.property_rule bs r p h
+
+theorem Spec.empty_body_rule (bs r : List UInt8) :
+    (parsePacket bs = some (.pingreq, r) → bs = [192, 0] ++ r)
+    ∧ (parsePacket bs = some (.pingresp, r) → bs = [208, 0] ++ r) :=
+  Mqtt.Proofs.empty_body_rule bs r
 
 theorem Spec.rejects_subscribe_flags :
     (parse ([128, 7, 0, 1, 0, 0, 1, 97, 0] : List UInt8)).isSome

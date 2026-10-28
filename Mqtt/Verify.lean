@@ -23,3 +23,12 @@ open Mqtt.Proofs Mqtt.Examples
 #print axioms parse_publish_qos1
 #print axioms vbi_max
 #print axioms vbi_five_bytes
+#print axioms printVBI_length
+#print axioms decVBI_length
+#print axioms parse_iff
+#print axioms header_rule
+#print axioms connect_rule
+#print axioms publish_rule
+#print axioms subscribe_rule
+#print axioms property_rule
+#print axioms empty_body_rule

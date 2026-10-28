@@ -104,7 +104,9 @@ theorem Spec.parsePacket_frame (bs : List UInt8) (p : Packet)
       ∧ bs = b :: (printVBI body.length ++ body) ++ r := sorry
 
 /-- The remaining length `[128, 0]`, a two byte writing of 0, is
-    refused, while its shortest writing `[0]` gives the PINGREQ. -/
+    refused, while its shortest writing `[0]` gives the PINGREQ.
+    For every input: `Spec.decVBI_length` with
+    `Spec.parsePacket_frame`. -/
 theorem Spec.rejects_non_minimal_remaining_length :
     (parse ([192, 128, 0] : List UInt8)).isSome = false
       ∧ parse ([192, 0] : List UInt8) = some .pingreq := sorry
@@ -134,30 +136,110 @@ theorem Spec.parsePacket_four_byte_cap (h b0 b1 b2 b3 : UInt8)
     parsePacket (h :: b0 :: b1 :: b2 :: b3 :: rest) = none
       ∧ parse (h :: b0 :: b1 :: b2 :: b3 :: rest) = none := sorry
 
+/-! ## The refusal rules, for every input
+
+Each statement here holds the reader to a rule written in
+`Spec/Defs.lean`, part of the specification, for every input.
+They are stated for the stream reader `parsePacket`. By
+`Spec.parse_whole`, the whole input reader `parse` accepts a
+byte list exactly when `parsePacket` takes one packet from it
+and leaves nothing, so each holds for `parse` as well. -/
+
+/-- The whole input reader accepts a byte list, and returns a
+    packet, exactly when the stream reader takes that packet
+    from it and leaves no byte after it. -/
+theorem Spec.parse_whole (bs : List UInt8) (p : Packet) :
+    parse bs = some p ↔ parsePacket bs = some (p, []) := sorry
+
+/-- Every packet the stream reader takes starts with one of the
+    sixteen header bytes of `Spec.headerBytes`. So a SUBSCRIBE
+    whose flags are not 0010, any other type with flags other
+    than 0000, a PUBLISH with QoS 3 or with DUP set at QoS 0,
+    and every packet type outside the seven of this slice are
+    refused. -/
+theorem Spec.header_rule (bs : List UInt8) (p : Packet) (r : List UInt8)
+    (h : parsePacket bs = some (p, r)) :
+    ∃ (b : UInt8) (tl : List UInt8), bs = b :: tl ∧ b ∈ Spec.headerBytes := sorry
+
+/-- Every CONNECT the stream reader takes is the header byte
+    0x10, the length of the body, and a body that starts with
+    the protocol name `MQTT` as a string field (the bytes 0, 4,
+    77, 81, 84, 84; section 3.1.2.1), the protocol level 5
+    (section 3.1.2.2), and a connect flags byte that keeps
+    `Spec.ConnectFlagsRule`. When a will stands, its topic is not
+    empty and keeps `Spec.TopicNameRule` (sections 3.1.3.3 and
+    4.7). -/
+theorem Spec.connect_rule (bs r : List UInt8) (c : Connect)
+    (h : parsePacket bs = some (.connect c, r)) :
+    (∃ (f : UInt8) (tail : List UInt8),
+      bs = 16 :: (printVBI (8 + tail.length) ++ ([0, 4, 77, 81, 84, 84, 5, f] ++ tail)) ++ r
+      ∧ Spec.ConnectFlagsRule f.toNat)
+    ∧ ∀ w, c.will = some w → w.topic ≠ [] ∧ Spec.TopicNameRule w.topic := sorry
+
+/-- Every PUBLISH the stream reader takes has a topic name that
+    keeps `Spec.TopicNameRule`, and that is empty only when its
+    properties carry a Topic Alias, 0x23 (section 3.3.2.1: "It is
+    a Protocol Error if the Topic Name is zero length and there
+    is no Topic Alias"). Its packet identifier stands exactly
+    when the QoS is not 0 [MQTT-2.2.1-2], and is never 0
+    [MQTT-2.2.1-3]. -/
+theorem Spec.publish_rule (bs r : List UInt8) (m : Publish)
+    (h : parsePacket bs = some (.publish m, r)) :
+    Spec.TopicNameRule m.topic ∧ (m.topic = [] → ∃ q ∈ m.props, q.id = 0x23)
+    ∧ (m.packetId = none ↔ m.qos = 0) ∧ (∀ i, m.packetId = some i → i ≠ 0) := sorry
+
+/-- Every SUBSCRIBE the stream reader takes has a packet
+    identifier other than 0 [MQTT-2.2.1-3], at least one topic
+    filter [MQTT-3.8.3-2], and every topic filter, with its
+    options, keeps `Spec.FilterRule`. -/
+theorem Spec.subscribe_rule (bs r : List UInt8) (i : Nat) (ps : List Property)
+    (fs : List (List Char × SubOpts))
+    (h : parsePacket bs = some (.subscribe i ps fs, r)) :
+    i ≠ 0 ∧ fs ≠ [] ∧ ∀ fo ∈ fs, Spec.FilterRule fo.1 fo.2 := sorry
+
+/-- Every property block of every packet the stream reader
+    takes, as `Spec.blocks` lists them, keeps `Spec.BlockRule`:
+    each property is allowed on its block, has its identifier's
+    value type and keeps the value rules of `Spec.ValueRule`, no
+    single use property repeats, and Authentication Data stands
+    only with an Authentication Method. -/
+theorem Spec.property_rule (bs : List UInt8) (p : Packet) (r : List UInt8)
+    (h : parsePacket bs = some (p, r)) :
+    ∀ b ∈ Spec.blocks p, Spec.BlockRule b.1 b.2 := sorry
+
+/-- Every PINGREQ the stream reader takes is the two bytes 192,
+    0, and every PINGRESP the two bytes 208, 0: neither carries
+    a body (sections 3.12 and 3.13). -/
+theorem Spec.empty_body_rule (bs r : List UInt8) :
+    (parsePacket bs = some (.pingreq, r) → bs = [192, 0] ++ r)
+    ∧ (parsePacket bs = some (.pingresp, r) → bs = [208, 0] ++ r) := sorry
+
 /-! ## Example inputs
 
 Single inputs the reader refuses or accepts, for the headline
 rules of `SPEC.md`; the test harness has a named case for each
 rule. Each statement is about its own inputs only, so a reader
 of the specification can check each rule against a concrete
-case. That the rule holds for every input follows from
-`Spec.parse_sound` and the well formedness rules it names. -/
+case. The rule each one illustrates is stated for every input
+in the section above, by the statement its docstring names. -/
 
 /-- A SUBSCRIBE packet with flags 0000 is refused: the value the
-    standard fixes for SUBSCRIBE is 0010. -/
+    standard fixes for SUBSCRIBE is 0010. For every input:
+    `Spec.header_rule`. -/
 theorem Spec.rejects_subscribe_flags :
     (parse ([128, 7, 0, 1, 0, 0, 1, 97, 0] : List UInt8)).isSome
       = false := sorry
 
 /-- A PUBLISH packet with QoS 3, header 0x36, is refused: that
-    QoS value is reserved. -/
+    QoS value is reserved. For every input: `Spec.header_rule`. -/
 theorem Spec.rejects_publish_qos3 :
     (parse ([54, 7, 0, 1, 97, 0, 1, 0, 120] : List UInt8)).isSome
       = false := sorry
 
 /-- A PUBLISH with the DUP flag set at QoS 0 is refused (section
     3.3.1.1, [MQTT-3.3.1-2]): the header byte 0x38. The same
-    packet with DUP clear, header 0x30, is accepted. -/
+    packet with DUP clear, header 0x30, is accepted. For every
+    input: `Spec.header_rule`. -/
 theorem Spec.rejects_dup_at_qos0 :
     (parse ([56, 4, 0, 1, 97, 0] : List UInt8)).isSome = false
     ∧ parse ([48, 4, 0, 1, 97, 0] : List UInt8)
@@ -168,25 +250,28 @@ theorem Spec.rejects_dup_at_qos0 :
     (sections 3.3.2.1 and 3.3.2.3.4): here Topic Alias 1. The same
     packet with no property is refused, since "It is a Protocol
     Error if the Topic Name is zero length and there is no Topic
-    Alias" (section 3.3.2.1). -/
+    Alias" (section 3.3.2.1). For every input:
+    `Spec.publish_rule`. -/
 theorem Spec.empty_topic_needs_alias :
     parse ([48, 6, 0, 0, 3, 35, 0, 1] : List UInt8)
       = some (.publish ⟨false, 0, false, [], none, [⟨35, .twoByte 1⟩], []⟩)
     ∧ (parse ([48, 3, 0, 0, 0] : List UInt8)).isSome = false := sorry
 
 /-- A PUBLISH topic name holding a wildcard is refused: `a/#` is
-    a filter, not a topic name. -/
+    a filter, not a topic name. For every input:
+    `Spec.publish_rule`. -/
 theorem Spec.rejects_wildcard_topic :
     (parse ([48, 7, 0, 3, 97, 47, 35, 0, 120] : List UInt8)).isSome
       = false := sorry
 
-/-- A CONNECT whose protocol name is not `MQTT` is refused. -/
+/-- A CONNECT whose protocol name is not `MQTT` is refused. For
+    every input: `Spec.connect_rule`. -/
 theorem Spec.rejects_wrong_protocol_name :
     (parse ([16, 14, 0, 4, 77, 81, 84, 85, 5, 2, 0, 0, 0, 0, 1, 120]
       : List UInt8)).isSome = false := sorry
 
 /-- A CONNECT with the reserved bit of the connect flags byte
-    set is refused. -/
+    set is refused. For every input: `Spec.connect_rule`. -/
 theorem Spec.rejects_reserved_connect_flag :
     (parse ([16, 14, 0, 4, 77, 81, 84, 84, 5, 3, 0, 0, 0, 0, 1, 120]
       : List UInt8)).isSome = false := sorry
@@ -196,7 +281,8 @@ theorem Spec.rejects_reserved_connect_flag :
     [MQTT-3.1.2-11] and 3.1.2.7 [MQTT-3.1.2-13]): here the
     connect flags 0x0A (will QoS 1) and 0x22 (will retain). With
     the flags 0x02 the same bytes are the CONNECT of
-    `Mqtt.Examples.parse_connect`. -/
+    `Mqtt.Examples.parse_connect`. For every input:
+    `Spec.connect_rule`. -/
 theorem Spec.rejects_will_bits_without_will :
     (parse ([16, 14, 0, 4, 77, 81, 84, 84, 5, 10, 0, 0, 0, 0, 1, 120]
       : List UInt8)).isSome = false
@@ -204,13 +290,14 @@ theorem Spec.rejects_will_bits_without_will :
       : List UInt8)).isSome = false := sorry
 
 /-- A CONNECT carrying a Subscription Identifier, a property its
-    block does not allow, is refused. -/
+    block does not allow, is refused. For every input:
+    `Spec.property_rule`. -/
 theorem Spec.rejects_property_wrong_type :
     (parse ([16, 16, 0, 4, 77, 81, 84, 84, 5, 2, 0, 0, 2, 11, 5, 0,
       1, 120] : List UInt8)).isSome = false := sorry
 
 /-- A PUBLISH carrying the single use Topic Alias twice in one
-    block is refused. -/
+    block is refused. For every input: `Spec.property_rule`. -/
 theorem Spec.rejects_repeated_property :
     (parse ([50, 12, 0, 1, 97, 0, 3, 6, 35, 0, 1, 35, 0, 2]
       : List UInt8)).isSome = false := sorry
@@ -221,7 +308,8 @@ theorem Spec.rejects_repeated_property :
     its level, an empty filter, a shared subscription with No
     Local set, and `$share/` with no filter after the ShareName.
     Two filters that keep the rules are accepted: `a/+/#`, and
-    `$share/g/t` with No Local clear. -/
+    `$share/g/t` with No Local clear. For every input:
+    `Spec.subscribe_rule`. -/
 theorem Spec.rejects_bad_topic_filters :
     -- `a/#/b`: `#` not in the last level
     (parse ([130, 11, 0, 1, 0, 0, 5, 97, 47, 35, 47, 98, 0]
@@ -247,7 +335,8 @@ theorem Spec.rejects_bad_topic_filters :
             ⟨0, false, false, 0⟩)]) := sorry
 
 /-- A SUBSCRIBE with packet identifier 0 is refused:
-    identifiers are never 0. -/
+    identifiers are never 0. For every input:
+    `Spec.subscribe_rule`. -/
 theorem Spec.rejects_subscribe_id_zero :
     (parse ([130, 7, 0, 0, 0, 0, 1, 97, 0] : List UInt8)).isSome
       = false := sorry
@@ -259,7 +348,8 @@ theorem Spec.rejects_subscribe_id_zero :
     Information of 2, Authentication Data with no Authentication
     Method, and a Response Topic that holds a wildcard or is
     empty. Changing the offending value byte (to 1, or to `b`
-    for the Response Topic) gives an input the reader accepts. -/
+    for the Response Topic) gives an input the reader accepts.
+    For every input: `Spec.property_rule`. -/
 theorem Spec.rejects_property_value_rules :
     -- Subscription Identifier 0, on a SUBSCRIBE
     (parse ([130, 9, 0, 1, 2, 11, 0, 0, 1, 97, 0] : List UInt8)).isSome = false
@@ -299,11 +389,11 @@ theorem Spec.disconnect_short_form :
     ∧ print (.disconnect (some (0, some []))) = [224, 2, 0, 0] := sorry
 
 /-- A PINGREQ with a body is refused: its remaining length must
-    be 0. -/
+    be 0. For every input: `Spec.empty_body_rule`. -/
 theorem Spec.rejects_pingreq_body :
     (parse ([192, 1, 0] : List UInt8)).isSome = false := sorry
 
 /-- The packet `[32, 0]`, of type 2, outside the seven in this
-    slice, is refused. -/
+    slice, is refused. For every input: `Spec.header_rule`. -/
 theorem Spec.rejects_unknown_type :
     (parse ([32, 0] : List UInt8)).isSome = false := sorry
