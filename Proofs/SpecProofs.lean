@@ -2,13 +2,15 @@
   Proofs of the statements in `Spec.lean`, under the same names.
 
   The round trips are the theorems proved in
-  `Proofs/RoundTrip.lean`. The refusals are single inputs,
+  `Proofs/RoundTrip.lean`, and the soundness of the reader the
+  ones proved in `Proofs/Sound.lean`. The refusals are single inputs,
   checked in the kernel with `decide +kernel`: no native
   evaluation, which the bar forbids.
 -/
 
 import Mqtt
 import Proofs.RoundTrip
+import Proofs.Sound
 
 open Mqtt
 
@@ -20,6 +22,15 @@ theorem Spec.parsePacket_print (p : Packet) (rest : List UInt8)
 theorem Spec.parse_print (p : Packet) (h : PacketWF p) :
     parse (print p) = some p :=
   Mqtt.Proofs.parse_print p h
+
+theorem Spec.parse_sound (bs : List UInt8) (p : Packet)
+    (h : parse bs = some p) : PacketWF p ∧ print p = bs :=
+  Mqtt.Proofs.parse_inv bs p h
+
+theorem Spec.parsePacket_sound (bs : List UInt8) (p : Packet)
+    (r : List UInt8) (h : parsePacket bs = some (p, r)) :
+    PacketWF p ∧ bs = print p ++ r :=
+  Mqtt.Proofs.parsePacket_inv bs p r h
 
 theorem Spec.decVBI_printVBI (n : Nat) (rest : List UInt8)
     (hn : n < 268435456) :

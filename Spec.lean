@@ -20,8 +20,10 @@ open Mqtt
 /-! ## The round trips
 
 The statements the slice stands on. Each one is the statement of
-the proved theorem of the same shape in `Proofs/RoundTrip.lean`,
-over the same well formedness predicate, `Mqtt.PacketWF`. -/
+the proved theorem of the same shape in `Proofs/RoundTrip.lean`
+(printing, then reading) or `Proofs/Sound.lean` (reading, then
+printing), over the same well formedness predicate,
+`Mqtt.PacketWF`. -/
 
 /-- Parsing the printed form of a well formed packet, with more
     stream bytes after it, gives the packet and those bytes back.
@@ -35,6 +37,22 @@ theorem Spec.parsePacket_print (p : Packet) (rest : List UInt8)
     gives the packet back. -/
 theorem Spec.parse_print (p : Packet) (h : PacketWF p) :
     parse (print p) = some p := sorry
+
+/-- Every packet the whole input reader accepts is well formed,
+    and printing it gives back exactly the bytes it read. With
+    `Spec.parse_print`, the reader accepts a byte list exactly
+    when it is the printing of a well formed packet, and returns
+    that packet. So it refuses every byte list that is not such a
+    printing. -/
+theorem Spec.parse_sound (bs : List UInt8) (p : Packet)
+    (h : parse bs = some p) : PacketWF p ∧ print p = bs := sorry
+
+/-- Every packet the stream reader takes from the front of a byte
+    list is well formed, and the bytes it took are exactly its
+    printing, with the bytes it returns after them. -/
+theorem Spec.parsePacket_sound (bs : List UInt8) (p : Packet)
+    (r : List UInt8) (h : parsePacket bs = some (p, r)) :
+    PacketWF p ∧ bs = print p ++ r := sorry
 
 /-- Reading a printed variable byte integer gives the number
     back, for every value below 2^28, the most four bytes carry. -/

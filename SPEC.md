@@ -321,10 +321,24 @@ actually remain before taking any of them. Any shortfall, at
 any point, is a rejection, not a partial read. Each type's
 reader must consume its body cut exactly.
 
+Soundness, proved for every input: what the reader accepts is
+exactly the printed form of a well formed packet. The whole
+input reader accepts a byte list only when it is the printing
+of a well formed packet, and returns that packet; the stream
+reader takes from the front of its input exactly the printing
+of the well formed packet it returns, and returns the rest
+untouched. With the round trip, the reader and the printer
+are inverse to each other: the byte lists the reader accepts
+are exactly the printings of well formed packets. So every
+rule of well formedness below, and every fixed byte the
+printer writes, is a rule the reader enforces on every
+input.
+
 ## Well formed values
 
 The round trip claim holds for well formed packets: the
-fields the printer can write exactly. In outline:
+fields the printer can write exactly. Every packet the reader
+accepts is well formed. In outline:
 
 - Every number fits the width that carries it: keep alive and
   packet identifiers and two byte property values below
@@ -361,9 +375,9 @@ remaining length as a minimal variable byte integer, and the
 body in the layouts above. Property blocks are written with a
 minimal property length, and property identifiers and
 variable byte integer values in their minimal form, which is
-the only form the reader accepts. A packet read by the reader and
-printed again is in this canonical form; a packet that
-arrived already in canonical form reprints byte for byte.
+the only form the reader accepts. Every packet the reader
+accepts reprints byte for byte: the printer's form is the
+only form the reader accepts.
 
 ## The line protocol
 
@@ -397,9 +411,12 @@ oracle.
 ## Properties and their theorems
 
 Each property a reader can check in the page (`README.md`)
-names its theorem. A row marked "one example input" is proved
-for that input only; the rule it illustrates is checked on
-many more inputs by the tests, not proved in general. The theorems are stated in `Spec.lean`
+names its theorem. A row marked "one example input" is a
+theorem about that input alone. The rule it illustrates holds
+for every input through `Spec.parse_sound`: an accepted input
+is the printing of a well formed packet, and no well formed
+packet prints in the refused way, as the sections above
+describe. The theorems are stated in `Spec.lean`
 and proved in `Proofs/SpecProofs.lean`. The variable byte
 integer and frame theorems, and the four byte cap theorems,
 hold for every input. The other refusal theorems are
@@ -411,6 +428,8 @@ inputs.
 |----------|---------|
 | Parsing the printed form of a well formed packet, with more stream bytes after it, gives the packet and those bytes back | `Spec.parsePacket_print` |
 | Parsing the printed form of a well formed packet on its own gives the packet back | `Spec.parse_print` |
+| Every packet the whole input reader accepts is well formed, and printing it gives back exactly the bytes it read; so the reader refuses every byte list that is not the printing of a well formed packet | `Spec.parse_sound` |
+| Every packet the stream reader takes is well formed, and the bytes it took are exactly its printing, followed by the bytes it returns | `Spec.parsePacket_sound` |
 | Reading a printed variable byte integer gives the number back, below 2^28 | `Spec.decVBI_printVBI` |
 | What the variable byte integer reader accepts is the printer's writing of the value it returns, the shortest one, so a longer writing is refused; the value is below 2^28 | `Spec.decVBI_canonical` |
 | Every packet the stream reader takes is a header byte, the shortest writing of the body length, and that many body bytes, all in the input; the bytes it returns are the ones after them | `Spec.parsePacket_frame` |

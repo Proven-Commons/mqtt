@@ -55,14 +55,17 @@ theorems are stated in `Spec.lean` (the challenge file,
 where they end in `sorry`) and proved in
 `Proofs/SpecProofs.lean`, under the same names.
 `comparator.json` lists all of them. A claim that names
-its input, or says "one example input", is proved for
-that input only: the rule it illustrates is tested on
-many more inputs, not proved in general.
+its input, or says "one example input", is a theorem
+about that input alone, which a reader can check by
+evaluation; the paragraph after the table says how the
+rule it illustrates holds for every input.
 
 | Claim | Theorem |
 |-------|---------|
 | Parsing the printed form of a well formed packet, with more stream bytes after it, gives the packet and those bytes back. | `Spec.parsePacket_print` |
 | Parsing the printed form of a well formed packet on its own gives the packet back. | `Spec.parse_print` |
+| Every packet the whole input reader `parse` accepts is well formed, and printing it gives back exactly the bytes it read. With the row above, `parse` accepts a byte list exactly when it is the printing of a well formed packet, and refuses every other byte list. | `Spec.parse_sound` |
+| Every packet the stream reader `parsePacket` takes from the front of a byte list is well formed, and the bytes it took are exactly its printing, followed by the bytes it returns: it never takes a byte the input does not hold. | `Spec.parsePacket_sound` |
 | Reading a printed variable byte integer gives the number back, for every value below 2^28. | `Spec.decVBI_printVBI` |
 | What the variable byte integer reader `decVBI` accepts is exactly the printer's writing of the value it returns, which is the shortest writing, followed by the bytes it returns; the value is below 2^28. So a writing longer than the value needs, such as 128, 0 for 0, is refused (section 1.5.5, MQTT-1.5.5-1). | `Spec.decVBI_canonical` |
 | Every packet the stream reader `parsePacket` takes is a header byte, the shortest writing of the body length, and that many body bytes, all standing in the input; the bytes it returns are exactly the ones after them. | `Spec.parsePacket_frame` |
@@ -95,20 +98,39 @@ Alias, Receive Maximum or Maximum Packet Size of 0, and
 so on, as `SPEC.md` lists), and repeat no single use
 property, its packet identifiers stand where the
 type requires them and are never 0 there, a PUBLISH at
-QoS 0 has DUP clear, and its whole
-body is shorter than 2^28, the largest remaining length a
-variable byte integer can carry. The full list is in
+QoS 0 has DUP clear, a PUBLISH topic name holds no
+wildcard and is empty only beside a Topic Alias, its
+SUBSCRIBE topic filters keep the filter rules, and its
+whole body is shorter than 2^28, the largest remaining
+length a variable byte integer can carry. The full list is in
 `SPEC.md`.
+
+Because of `Spec.parse_sound`, each refusal rule the
+table illustrates with one example input holds for every
+input: an accepted input is the printing of a well formed
+packet, and no well formed packet prints with, say, a
+SUBSCRIBE flags nibble other than 0010, a DUP flag at QoS
+0, a Topic Alias of 0 or a topic filter `a/#/b`. Seeing
+that a given rule follows takes reading the well
+formedness rules and the printer in `Mqtt/Value.lean`,
+which `SPEC.md` describes; the rule is not restated as a
+theorem of its own.
 
 The round trip theorems rest on the proofs in
 `Proofs/RoundTrip.lean`, where they are
 `Mqtt.Proofs.parsePacket_print`, `Mqtt.Proofs.parse_print`,
-and `Mqtt.Proofs.decVBI_printVBI`. All three check against
-the standard axioms only (`propext`, `Classical.choice`,
-`Quot.sound`), which a reader can confirm with
-`#print axioms`, or by running
-`lake env lean Mqtt/Verify.lean`. The refusal theorems are
-single inputs checked in the kernel with `decide +kernel`.
+and `Mqtt.Proofs.decVBI_printVBI`. The soundness theorems
+rest on `Proofs/Sound.lean`, where they are
+`Mqtt.Proofs.parse_inv` and `Mqtt.Proofs.parsePacket_inv`,
+built from one inverse lemma per field reader, and on the
+inverse of the strict UTF-8 decoder,
+`Mqtt.Utf8.Proofs.decode_inv` in `Proofs/Utf8Inv.lean`.
+All of them check against the standard axioms only
+(`propext`, `Classical.choice`, `Quot.sound`), which a
+reader can confirm with `#print axioms`, or by running
+`lake env lean Mqtt/Verify.lean`. The theorems about
+single inputs are checked in the kernel with
+`decide +kernel`.
 Under the round trips, the field and body steps are proved
 one by one in the same file: big endian numbers, byte cuts,
 string and binary fields, typed property values, single
@@ -125,32 +147,31 @@ are about.
 
 ## What is not proved
 
-- That the reader accepts every byte string the standard
-  allows, and rejects every one it forbids. The round trips
-  do not need either. The variable byte integer, frame and
-  four byte cap theorems hold for every input, but the other
-  refusal theorems pin single inputs only, so neither holds
-  in general as a proof. The
-  oracle differential and the mutation tests in `tests/`
-  check that behaviour instead, and the results file
-  records the outcome, including any failure.
+- That well formedness and the printer match the MQTT 5.0
+  standard. The proofs show that the reader accepts exactly
+  the printings of well formed packets (`Spec.parse_print`
+  with `Spec.parse_sound`). That this set is the set of byte
+  strings the standard allows for these seven packet types
+  is a reading of the standard: `SPEC.md` states it, a
+  reviewer checks it against the standard, and the oracle
+  differential and the mutation tests in `tests/` probe it,
+  with the outcome in the results file. It is not proved.
 - Any reading of what a property means. A property is an
   identifier and a typed value; that a Receive Maximum of
   10 asks the peer to hold back after ten packets is broker
   and session behaviour, and none of it is in this slice.
 - Anything about packets outside the seven types, or
-  property identifiers outside the table in `SPEC.md`.
-  Both are rejected, and that rejection is tested, apart
-  from the single inputs the refusal theorems pin.
+  property identifiers outside the table in `SPEC.md`,
+  beyond their refusal, which follows from
+  `Spec.parse_sound`.
 - Broker or session behaviour of any kind: connections,
   subscriptions as state, retained messages, keep alive
   timing, and what any peer does with a packet.
-- The worked examples on the printing side. The examples
-  in `Proofs/Examples.lean` are stated on the reading side,
-  because the printer's variable byte integer is defined
-  by well founded recursion, which the kernel will not
-  evaluate in a `decide` proof here. The round trip
-  theorems cover the printer.
+- Worked examples on the printing side, beyond the two
+  DISCONNECT packets of `Spec.disconnect_short_form`. The
+  examples in `Proofs/Examples.lean` are stated on the
+  reading side. The round trip and soundness theorems
+  cover the printer in general.
 - Reading requests and printing answers in `Main.lean`:
   splitting lines, and the decimal number reader. The tests
   cover them, malformed requests included.
@@ -218,6 +239,7 @@ are about.
    same either way.
 3. `lake build`: the library, the proofs, and the tool
    build clean, and `lake env lean Mqtt/Verify.lean`
-   prints the axiom list for the round trip theorems.
+   prints the axiom list for the round trip and
+   soundness theorems.
 4. Read `SPEC.md` against the MQTT 5.0 standard and check
    the pinned readings are the ones you want.

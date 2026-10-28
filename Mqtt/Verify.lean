@@ -16,6 +16,9 @@ open Mqtt.Proofs Mqtt.Examples
 #print axioms parse_print
 #print axioms parsePacket_print
 #print axioms decVBI_printVBI
+#print axioms parse_inv
+#print axioms parsePacket_inv
+#print axioms decVBI_canonical
 #print axioms parse_connect
 #print axioms parse_publish_qos1
 #print axioms vbi_max
