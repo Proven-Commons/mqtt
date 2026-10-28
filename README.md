@@ -50,6 +50,16 @@ packets of each forbidden class drawn from the seed, and
 writes the outcome to `tests/TEST-RESULTS.md`: the
 oracle, the seed, the input count and the failures.
 
+`python3 tests/plant_bugs.py` plants small bugs in the
+reader and its rules, one at a time in a scratch copy of
+the repo: a five byte cap, longer writings of a variable
+byte integer accepted, short input padded with zeros,
+partial weakenings of the filter and value rules, and
+more. For each it names the approved statement the plant
+makes false, checks that the test harness reports a
+failure and that the proofs no longer build, and writes
+the outcome to `tests/PLANTED-BUGS.md`.
+
 ## What is proved
 
 Each claim below names the theorem behind it. The
