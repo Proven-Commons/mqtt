@@ -148,7 +148,7 @@ CONNACK). The identifier has a known value type, but it is on
 no allowed list here, so the reader rejects it everywhere in
 this slice.
 
-Three property checks reject a packet:
+These property checks reject a packet:
 
 - An identifier with no row in the table is rejected.
 - A property standing on a block whose allowed list does not
@@ -160,6 +160,30 @@ Three property checks reject a packet:
   repeat on PUBLISH, where one message can match several
   subscriptions (section 3.3.4). Every other allowed property
   may stand at most once in one block.
+- A value the standard calls a Protocol Error is rejected
+  (`propValOK` in `Mqtt/Value.lean`):
+  - a Response Topic (0x08) that is empty or holds `+` or `#`:
+    it is used as a Topic Name (sections 3.3.2.3.5
+    [MQTT-3.3.2-14], 4.7.0 [MQTT-4.7.0-1], 4.7.3
+    [MQTT-4.7.3-1]), on PUBLISH and in the will alike;
+  - a Subscription Identifier (0x0B) of 0 (sections 3.3.2.3.8
+    and 3.8.2.1.2);
+  - a Request Problem Information (0x17) or Request Response
+    Information (0x19) other than 0 or 1 (sections 3.1.2.11.7
+    and 3.1.2.11.6);
+  - a Receive Maximum (0x21) of 0 (section 3.1.2.11.3);
+  - a Topic Alias (0x23) of 0 (section 3.3.2.3.4,
+    [MQTT-3.3.2-8]);
+  - a Maximum Packet Size (0x27) of 0 (section 3.1.2.11.4).
+- Authentication Data (0x16) in a block with no Authentication
+  Method (0x15) is rejected (section 3.1.2.11.10; `authOK`).
+
+Other values of the right type are accepted. In particular a
+Payload Format Indicator (0x01) other than 0 or 1 is accepted:
+section 3.3.2.3.2 names the two values but, unlike the rules
+above, does not call another value a Protocol Error. Rules
+that depend on the session, such as a Topic Alias above the
+peer's Topic Alias Maximum, are outside this slice.
 
 ## The seven packet types
 
@@ -284,8 +308,10 @@ fields the printer can write exactly. In outline:
 - Strings obey the string rules and their UTF-8 byte length
   fits the two byte length prefix; binary data fields fit the
   same prefix.
-- Properties match the table in type and in place, and no
-  single use property repeats in one block.
+- Properties match the table in type and in place, keep the
+  value rules above, and no single use property repeats in one
+  block; Authentication Data stands only with an
+  Authentication Method.
 - CONNECT: the will, when one stands, has QoS at most 2, a
   well formed will property block, a topic that passes the
   topic name check, and a payload that fits its prefix.
@@ -368,5 +394,6 @@ inputs.
 | A property on a packet type that does not allow it is refused | `Spec.rejects_property_wrong_type` |
 | A single use property standing twice in one block is refused | `Spec.rejects_repeated_property` |
 | A SUBSCRIBE with packet identifier 0 is refused | `Spec.rejects_subscribe_id_zero` |
+| Property values the standard calls a Protocol Error are refused, one example input each: a Subscription Identifier, Topic Alias, Receive Maximum or Maximum Packet Size of 0, a Request Problem Information or Request Response Information of 2, Authentication Data without an Authentication Method, and a Response Topic that holds a wildcard or is empty | `Spec.rejects_property_value_rules` |
 | A PINGREQ with a body is refused | `Spec.rejects_pingreq_body` |
 | A packet type outside the seven in this slice is refused | `Spec.rejects_unknown_type` |

@@ -73,14 +73,18 @@ where they end in `sorry`) and proved in
 | A property standing on a packet type that does not allow it, here a subscription identifier on a CONNECT, is refused. | `Spec.rejects_property_wrong_type` |
 | A single use property standing twice in one block, here the topic alias on a PUBLISH, is refused. | `Spec.rejects_repeated_property` |
 | A SUBSCRIBE with packet identifier 0 is refused. | `Spec.rejects_subscribe_id_zero` |
+| Property values the standard calls a Protocol Error are refused, one example input each: a Subscription Identifier of 0 on a SUBSCRIBE, a Topic Alias of 0 on a PUBLISH, a Receive Maximum of 0, a Maximum Packet Size of 0, a Request Problem Information of 2, a Request Response Information of 2, and Authentication Data with no Authentication Method on a CONNECT, and a Response Topic `#` and an empty Response Topic on a PUBLISH. | `Spec.rejects_property_value_rules` |
 | A PINGREQ with a body is refused: its remaining length must be 0. | `Spec.rejects_pingreq_body` |
 | A packet type outside the seven in this slice, here type 2, is refused. | `Spec.rejects_unknown_type` |
 
 A packet is well formed when its numbers fit the widths
 that carry them, its strings obey the string rules and fit
 the two byte length prefix, its properties match the
-property table in type and place with no single use
-property repeated, its packet identifiers stand where the
+property table in type and place, keep the value rules
+the standard sets (no Subscription Identifier, Topic
+Alias, Receive Maximum or Maximum Packet Size of 0, and
+so on, as `SPEC.md` lists), and repeat no single use
+property, its packet identifiers stand where the
 type requires them and are never 0 there, and its whole
 body is shorter than 2^28, the largest remaining length a
 variable byte integer can carry. The full list is in

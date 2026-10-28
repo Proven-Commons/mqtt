@@ -220,6 +220,25 @@ def repeatable(setname, pid):
     return pid == 0x26 or (pid == 0x0B and setname == "publish")
 
 
+def prop_value_ok(pid, v):
+    """The value rules the standard sets on single property values
+    (SPEC.md, Properties): a value breaking one is a Protocol
+    Error."""
+    if pid == 0x08:
+        # Response Topic: used as a Topic Name (3.3.2.3.5, 4.7).
+        return v != "" and "+" not in v and "#" not in v
+    if pid in (0x0B, 0x21, 0x23, 0x27):
+        # Subscription Identifier (3.3.2.3.8, 3.8.2.1.2), Receive
+        # Maximum (3.1.2.11.3), Topic Alias (3.3.2.3.4), Maximum
+        # Packet Size (3.1.2.11.4): never 0.
+        return v != 0
+    if pid in (0x17, 0x19):
+        # Request Problem Information, Request Response
+        # Information (3.1.2.11.7, 3.1.2.11.6): 0 or 1.
+        return v in (0, 1)
+    return True
+
+
 def enc_prop_val(t, v):
     if t == "byte":
         return bytes([v])
@@ -281,8 +300,14 @@ def dec_props(setname, bs, i):
             raise Reject()
         seen.append(pid)
         v, j = dec_prop_val(PROP_TYPE[pid], seg, j)
+        if not prop_value_ok(pid, v):
+            raise Reject()
         ps.append((pid, v))
     if j != len(seg):
+        raise Reject()
+    # Authentication Data only with an Authentication Method
+    # (3.1.2.11.10).
+    if 0x16 in seen and 0x15 not in seen:
         raise Reject()
     return ps, end
 
@@ -522,7 +547,20 @@ def rand_bytes(rng, hi=12):
     return bytes(rng.randrange(256) for _ in range(rng.randint(0, hi)))
 
 
-def rand_prop_value(rng, t):
+def rand_prop_value(rng, pid):
+    """A random value for a property, kept to the standard's value
+    rules: a value that breaks one is a forbidden packet, which
+    the named rejection cases cover instead."""
+    while True:
+        if pid == 0x08:
+            v = rand_topic(rng)
+        else:
+            v = rand_typed_value(rng, PROP_TYPE[pid])
+        if prop_value_ok(pid, v):
+            return v
+
+
+def rand_typed_value(rng, t):
     if t == "byte":
         return rng.choice([0, 1, 2, 255, rng.randrange(256)])
     if t == "two":
@@ -546,11 +584,13 @@ def rand_props(rng, setname):
     ids = list(ALLOWED[setname])
     rng.shuffle(ids)
     ids = ids[:rng.randint(0, min(4, len(ids)))]
+    if 0x16 in ids and 0x15 not in ids:
+        ids.append(0x15)
     ps = []
     for pid in ids:
-        ps.append((pid, rand_prop_value(rng, PROP_TYPE[pid])))
+        ps.append((pid, rand_prop_value(rng, pid)))
         if repeatable(setname, pid) and rng.random() < 0.4:
-            ps.append((pid, rand_prop_value(rng, PROP_TYPE[pid])))
+            ps.append((pid, rand_prop_value(rng, pid)))
     return ps
 
 
@@ -629,7 +669,12 @@ def fixed_cases():
               "oracle encoder differs from the spec table")
         pkt = ("subscribe", 1, [(0x0B, value)],
                [("a", (0, False, False, 0))])
-        add(f"vbi {value} as a property value", enc_packet(pkt))
+        if value == 0:
+            # A Subscription Identifier of 0 is a Protocol Error.
+            add("vbi 0 as a subscription identifier, refused",
+                enc_packet(pkt), "none")
+        else:
+            add(f"vbi {value} as a property value", enc_packet(pkt))
     for value in (0, 127, 128, 16383, 16384):
         if value == 0:
             add("remaining length 0", bytes([192, 0]))
@@ -940,6 +985,49 @@ def mutation_cases(rng):
     named.append(("ill formed utf-8 in publish topic", bad_utf8, "none"))
     overlong = raw_packet(0x30, be16(2) + b"\xc0\x80" + b"\x00")
     named.append(("overlong utf-8 in publish topic", overlong, "none"))
+    # Property values the standard calls a Protocol Error, each
+    # beside a control that differs in the value alone.
+    connect_head = enc_str("MQTT") + bytes([5, 2]) + be16(0)
+    for label, setname, props, ok_props in (
+            ("subscription identifier 0 on subscribe", "subscribe",
+             [(0x0B, 0)], [(0x0B, 1)]),
+            ("subscription identifier 0 on publish", "publish",
+             [(0x0B, 0)], [(0x0B, 5)]),
+            ("topic alias 0", "publish", [(0x23, 0)], [(0x23, 1)]),
+            ("response topic with #", "publish", [(0x08, "a/#")],
+             [(0x08, "a/b")]),
+            ("response topic with +", "publish", [(0x08, "+")],
+             [(0x08, "x")]),
+            ("empty response topic", "publish", [(0x08, "")],
+             [(0x08, "r")]),
+            ("receive maximum 0", "connect", [(0x21, 0)], [(0x21, 1)]),
+            ("maximum packet size 0", "connect", [(0x27, 0)],
+             [(0x27, 1)]),
+            ("request problem information 2", "connect", [(0x17, 2)],
+             [(0x17, 1)]),
+            ("request response information 2", "connect",
+             [(0x19, 2)], [(0x19, 0)]),
+            ("authentication data without method", "connect",
+             [(0x16, b"x")], [(0x15, "m"), (0x16, b"x")]),
+            ("response topic with # in will properties", "will",
+             [(0x08, "#")], [(0x08, "w")])):
+        for props_here, want in ((props, "none"), (ok_props, None)):
+            if setname == "subscribe":
+                bs = raw_packet(0x82, be16(1) + enc_props(props_here)
+                                + enc_str("a") + b"\x00")
+            elif setname == "publish":
+                bs = raw_packet(0x30, enc_str("a") + enc_props(props_here)
+                                + b"x")
+            elif setname == "connect":
+                bs = raw_packet(0x10, connect_head + enc_props(props_here)
+                                + enc_str("x"))
+            else:
+                bs = raw_packet(0x10, enc_str("MQTT") + bytes([5, 6])
+                                + be16(0) + b"\x00" + enc_str("x")
+                                + enc_props(props_here) + enc_str("w")
+                                + enc_bin(b""))
+            named.append((label if want else label + " (control)", bs,
+                          want if want else want_ok(bs)))
     for opts_byte, label in ((64, "options byte reserved bits set"),
                              (3, "options byte qos 3"),
                              (48, "options byte retain handling 3")):

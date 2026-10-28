@@ -152,6 +152,39 @@ theorem Spec.rejects_subscribe_id_zero :
     (parse ([130, 7, 0, 0, 0, 0, 1, 97, 0] : List UInt8)).isSome
       = false := sorry
 
+/-- Property values the standard calls a Protocol Error are
+    refused, one input each: a Subscription Identifier of 0, a
+    Topic Alias of 0, a Receive Maximum of 0, a Maximum Packet
+    Size of 0, a Request Problem Information or Request Response
+    Information of 2, Authentication Data with no Authentication
+    Method, and a Response Topic that holds a wildcard or is
+    empty. Changing the offending value byte (to 1, or to `b`
+    for the Response Topic) gives an input the reader accepts. -/
+theorem Spec.rejects_property_value_rules :
+    -- Subscription Identifier 0, on a SUBSCRIBE
+    (parse ([130, 9, 0, 1, 2, 11, 0, 0, 1, 97, 0] : List UInt8)).isSome = false
+    -- Topic Alias 0, on a PUBLISH
+    ∧ (parse ([48, 7, 0, 1, 97, 3, 35, 0, 0] : List UInt8)).isSome = false
+    -- Receive Maximum 0, on a CONNECT
+    ∧ (parse ([16, 17, 0, 4, 77, 81, 84, 84, 5, 2, 0, 0, 3, 33, 0, 0, 0, 1,
+        120] : List UInt8)).isSome = false
+    -- Maximum Packet Size 0, on a CONNECT
+    ∧ (parse ([16, 19, 0, 4, 77, 81, 84, 84, 5, 2, 0, 0, 5, 39, 0, 0, 0, 0, 0,
+        1, 120] : List UInt8)).isSome = false
+    -- Request Problem Information 2, on a CONNECT
+    ∧ (parse ([16, 16, 0, 4, 77, 81, 84, 84, 5, 2, 0, 0, 2, 23, 2, 0, 1, 120]
+        : List UInt8)).isSome = false
+    -- Request Response Information 2, on a CONNECT
+    ∧ (parse ([16, 16, 0, 4, 77, 81, 84, 84, 5, 2, 0, 0, 2, 25, 2, 0, 1, 120]
+        : List UInt8)).isSome = false
+    -- Authentication Data with no Authentication Method, on a CONNECT
+    ∧ (parse ([16, 17, 0, 4, 77, 81, 84, 84, 5, 2, 0, 0, 3, 22, 0, 0, 0, 1,
+        120] : List UInt8)).isSome = false
+    -- Response Topic `#`, on a PUBLISH
+    ∧ (parse ([48, 8, 0, 1, 97, 4, 8, 0, 1, 35] : List UInt8)).isSome = false
+    -- an empty Response Topic, on a PUBLISH
+    ∧ (parse ([48, 7, 0, 1, 97, 3, 8, 0, 0] : List UInt8)).isSome = false := sorry
+
 /-- A PINGREQ with a body is refused: its remaining length must
     be 0. -/
 theorem Spec.rejects_pingreq_body :

@@ -332,7 +332,8 @@ theorem readEntry_step (s : PropSet) (seen : List Nat) (bs : List UInt8) :
       if (allowedOf s).contains id && (repeatableIn s id || !seen.contains id) then
         match propTypeOf id with
         | none => none
-        | some t => (readPropVal t r1).map fun (v, r2) => (⟨id, v⟩, r2)
+        | some t => (readPropVal t r1).bind fun (v, r2) =>
+          if propValOK id v then some (⟨id, v⟩, r2) else none
       else none := rfl
 
 /-- One step of the property block reader, stated for
@@ -447,7 +448,7 @@ theorem readPropVal_printPropVal (v : PropVal) (rest : List UInt8) (h : ValWF v)
 theorem readEntry_printProperty (s : PropSet) (seen : List Nat) (p : Property)
     (rest : List UInt8)
     (hid : p.id ∈ allowedOf s) (hty : propTypeOf p.id = some (valType p.val))
-    (hval : ValWF p.val)
+    (hval : ValWF p.val) (hok : propValOK p.id p.val = true)
     (hrep : repeatableIn s p.id = true ∨ p.id ∉ seen) :
     readEntry s seen (printProperty p ++ rest) = some (p, rest) := by
   have hc : (allowedOf s).contains p.id = true := List.contains_iff_mem.mpr hid
@@ -467,7 +468,8 @@ theorem readEntry_printProperty (s : PropSet) (seen : List Nat) (p : Property)
   rw [if_pos (by rw [hc, hr]; rfl), hty]
   simp only []
   rw [readPropVal_printPropVal p.val rest hval]
-  rfl
+  simp only [Option.bind_some]
+  rw [ite_eq_left hok]
 
 /-- A printed property list reads back whole, when the list is
     well formed for its block: the reader spends one fuel per
@@ -501,11 +503,11 @@ theorem readEntriesGo_printPropsList : ∀ (fuel : Nat) (s : PropSet)
         have h4 : printVBI p.id = [] := (List.append_eq_nil_iff.mp h3).1
         rw [h4] at h1
         exact absurd h1 (by decide)
-      obtain ⟨hid, hty, hval, hrep, htail⟩ := hwf
+      obtain ⟨hid, hty, hval, hok, hrep, htail⟩ := hwf
       rw [List.length_cons] at hlen
       show readEntriesGo (fuel + 1) s seen (printPropsList (p :: ps')) = _
       rw [printPropsList, readEntriesGo, if_neg hne,
-        readEntry_printProperty s seen p (printPropsList ps') hid hty hval hrep]
+        readEntry_printProperty s seen p (printPropsList ps') hid hty hval hok hrep]
       simp only []
       rw [ih s (p.id :: seen) ps' (by omega) htail]
 
@@ -523,22 +525,25 @@ theorem propsList_length_le (ps : List Property) :
 
 /-- A whole printed property block's insides read back. -/
 theorem readEntries_printPropsList (s : PropSet) (ps : List Property)
-    (h : PropsWF s [] ps) : readEntries s (printPropsList ps) = some ps := by
+    (h : PropsWF s [] ps) (hauth : authOK ps = true) :
+    readEntries s (printPropsList ps) = some ps := by
   unfold readEntries
   rw [readEntriesGo_printPropsList (printPropsList ps).length s [] ps
     (propsList_length_le ps) h]
+  simp only []
+  rw [ite_eq_left hauth]
 
 /-- A printed property block reads back: the properties, with
     the bytes after the block left in place. -/
 theorem readProps_printProps (s : PropSet) (ps : List Property)
     (rest : List UInt8) (h : PropsBlockWF s ps) :
     readProps s (printProps ps ++ rest) = some (ps, rest) := by
-  obtain ⟨hwf, hlen⟩ := h
+  obtain ⟨hwf, hlen, hauth⟩ := h
   rw [readProps_step, printProps, List.append_assoc, decVBI_printVBI _ _ hlen]
   simp only [Option.bind_some]
   rw [readBytes_append _ _ _ rfl]
   simp only [Option.bind_some]
-  rw [readEntries_printPropsList s ps hwf]
+  rw [readEntries_printPropsList s ps hwf hauth]
   simp only [Option.bind_some]
 
 /-! ## Topic names and flag bits -/

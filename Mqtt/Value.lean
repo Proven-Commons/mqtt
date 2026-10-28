@@ -176,6 +176,42 @@ def allowedOf : PropSet → List Nat
 def repeatableIn (s : PropSet) (id : Nat) : Bool :=
   id = 0x26 || (id = 0x0B && s = .publish)
 
+/-- The value rules the standard sets on single property
+    values, beyond their type. A value that breaks one is a
+    Protocol Error:
+
+    - Response Topic (0x08) is used as a Topic Name, so it is
+      not empty and holds neither wildcard character (sections
+      3.3.2.3.5 [MQTT-3.3.2-14], 4.7.0 [MQTT-4.7.0-1] and
+      4.7.3 [MQTT-4.7.3-1]).
+    - Subscription Identifier (0x0B) is not 0 (sections
+      3.3.2.3.8 and 3.8.2.1.2).
+    - Request Problem Information (0x17) and Request Response
+      Information (0x19) are 0 or 1 (sections 3.1.2.11.7 and
+      3.1.2.11.6).
+    - Receive Maximum (0x21) is not 0 (section 3.1.2.11.3).
+    - Topic Alias (0x23) is not 0 (section 3.3.2.3.4,
+      [MQTT-3.3.2-8]).
+    - Maximum Packet Size (0x27) is not 0 (section
+      3.1.2.11.4).
+
+    Every other value of the right type passes. -/
+def propValOK : Nat → PropVal → Bool
+  | 0x08, .utf8 s => !s.isEmpty && !s.contains '+' && !s.contains '#'
+  | 0x0B, .varByte n => n != 0
+  | 0x17, .byte n => n ≤ 1
+  | 0x19, .byte n => n ≤ 1
+  | 0x21, .twoByte n => n != 0
+  | 0x23, .twoByte n => n != 0
+  | 0x27, .fourByte n => n != 0
+  | _, _ => true
+
+/-- The one rule the standard sets across a property block:
+    Authentication Data (0x16) may stand only together with an
+    Authentication Method (0x15) (section 3.1.2.11.10). -/
+def authOK (ps : List Property) : Bool :=
+  !(ps.any fun p => p.id == 0x16) || ps.any fun p => p.id == 0x15
+
 /-! ## String checks
 
   The specification's string rules (section 1.5.4): a string is
@@ -445,21 +481,23 @@ def ValWF : PropVal → Prop
 
 /-- A property list in the shape of one block: every property
     is allowed on the block's packet kind, its value matches
-    the table's type for its identifier and is itself well
-    formed, and no single use property repeats. The `seen`
-    list carries the identifiers already standing in the
-    block; calls start it empty. -/
+    the table's type for its identifier, is itself well formed
+    and keeps the value rules of `propValOK`, and no single use
+    property repeats. The `seen` list carries the identifiers
+    already standing in the block; calls start it empty. -/
 def PropsWF (s : PropSet) : List Nat → List Property → Prop
   | _, [] => True
   | seen, p :: ps =>
     p.id ∈ allowedOf s ∧ propTypeOf p.id = some (valType p.val) ∧ ValWF p.val
+      ∧ propValOK p.id p.val = true
       ∧ (repeatableIn s p.id = true ∨ p.id ∉ seen)
       ∧ PropsWF s (p.id :: seen) ps
 
-/-- A property block fit to print: the list is well formed and
-    its printed length fits a variable byte integer. -/
+/-- A property block fit to print: the list is well formed, its
+    printed length fits a variable byte integer, and it keeps
+    the block rule of `authOK`. -/
 def PropsBlockWF (s : PropSet) (ps : List Property) : Prop :=
-  PropsWF s [] ps ∧ (printPropsList ps).length < 268435456
+  PropsWF s [] ps ∧ (printPropsList ps).length < 268435456 ∧ authOK ps = true
 
 /-- A will fit to print. -/
 def WillWF (w : Will) : Prop :=

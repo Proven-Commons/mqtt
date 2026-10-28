@@ -28,7 +28,9 @@
   - Properties are checked against the specification's table:
     an identifier with no table entry, an identifier not
     allowed on the packet kind at hand, and a repeat of a single
-    use property are all rejected.
+    use property are all rejected. So is a value that breaks a
+    value rule (`propValOK`), and Authentication Data without
+    an Authentication Method (`authOK`).
 -/
 
 import Mqtt.Value
@@ -133,7 +135,8 @@ def readPropVal (t : PropType) : List UInt8 → Option (PropVal × List UInt8)
 /-- Read one property: the identifier as a variable byte
     integer, checked against the table and the block's allowed
     list, then the value in the shape of the table's type for
-    the identifier. A repeat of a single use property whose
+    the identifier, which must keep the value rules of
+    `propValOK`. A repeat of a single use property whose
     identifier already stands in `seen` is rejected. -/
 def readEntry (s : PropSet) (seen : List Nat) (bs : List UInt8) :
     Option (Property × List UInt8) := do
@@ -141,7 +144,8 @@ def readEntry (s : PropSet) (seen : List Nat) (bs : List UInt8) :
   if (allowedOf s).contains id && (repeatableIn s id || !seen.contains id) then
     match propTypeOf id with
     | none => none
-    | some t => (readPropVal t r1).map fun (v, r2) => (⟨id, v⟩, r2)
+    | some t => (readPropVal t r1).bind fun (v, r2) =>
+      if propValOK id v then some (⟨id, v⟩, r2) else none
   else none
 
 /-- Read properties until the input runs out, or `none` when
@@ -163,10 +167,10 @@ def readEntriesGo : Nat → PropSet → List Nat → List UInt8 →
         | some (ps, r2) => some (p :: ps, r2)
 
 /-- Read a whole property block's insides: exactly the given
-    bytes, all consumed. -/
+    bytes, all consumed, keeping the block rule of `authOK`. -/
 def readEntries (s : PropSet) (seg : List UInt8) : Option (List Property) :=
   match readEntriesGo seg.length s [] seg with
-  | some (ps, []) => some ps
+  | some (ps, []) => if authOK ps then some ps else none
   | _ => none
 
 /-- Read a property block: the property length as a variable
