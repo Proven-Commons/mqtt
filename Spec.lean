@@ -111,6 +111,46 @@ theorem Spec.rejects_non_minimal_remaining_length :
     (parse ([192, 128, 0] : List UInt8)).isSome = false
       ∧ parse ([192, 0] : List UInt8) = some .pingreq := sorry
 
+/-- A writing longer than its value needs is refused in each other
+    place a variable byte integer stands in a packet, one example
+    input each, while the same packet with the shortest writing is
+    accepted: the property length 0 of a PUBLISH written `[128, 0]`,
+    the property identifier 1 (Payload Format Indicator) written
+    `[129, 0]`, and the Subscription Identifier value 1 of a
+    SUBSCRIBE written `[129, 128, 0]`. These are single inputs: no
+    statement here covers every input in these places. -/
+theorem Spec.rejects_non_minimal_property_vbis :
+    (parse ([48, 5, 0, 1, 97, 128, 0] : List UInt8)).isSome = false
+      ∧ (parse ([48, 4, 0, 1, 97, 0] : List UInt8)).isSome = true
+      ∧ (parse ([48, 7, 0, 1, 97, 3, 129, 0, 1] : List UInt8)).isSome = false
+      ∧ (parse ([48, 6, 0, 1, 97, 2, 1, 1] : List UInt8)).isSome = true
+      ∧ (parse ([130, 11, 0, 1, 3, 11, 129, 128, 0, 0, 1, 97, 0]
+          : List UInt8)).isSome = false
+      ∧ (parse ([130, 9, 0, 1, 2, 11, 1, 0, 1, 97, 0]
+          : List UInt8)).isSome = true := sorry
+
+/-- The standard's worked table of variable byte integers
+    (section 1.5.5): the printer writes each boundary value as the
+    bytes the table gives, and the reader reads those bytes as that
+    value. These are single inputs; for other values the bytes are
+    pinned by the byte count (`Spec.printVBI_length`) and the round
+    trip (`Spec.decVBI_printVBI`), not by a statement of their
+    contents. -/
+theorem Spec.vbi_worked_table :
+    printVBI 0 = [0] ∧ printVBI 127 = [127]
+      ∧ printVBI 128 = [128, 1] ∧ printVBI 16383 = [255, 127]
+      ∧ printVBI 16384 = [128, 128, 1]
+      ∧ printVBI 2097151 = [255, 255, 127]
+      ∧ printVBI 2097152 = [128, 128, 128, 1]
+      ∧ printVBI 268435455 = [255, 255, 255, 127]
+      ∧ decVBI [0] = some (0, []) ∧ decVBI [127] = some (127, [])
+      ∧ decVBI [128, 1] = some (128, [])
+      ∧ decVBI [255, 127] = some (16383, [])
+      ∧ decVBI [128, 128, 1] = some (16384, [])
+      ∧ decVBI [255, 255, 127] = some (2097151, [])
+      ∧ decVBI [128, 128, 128, 1] = some (2097152, [])
+      ∧ decVBI [255, 255, 255, 127] = some (268435455, []) := sorry
+
 /-! ## The four byte cap
 
 The standard carries a variable byte integer in at most four

@@ -61,18 +61,36 @@ the minimum number of bytes necessary to represent the value
 [MQTT-1.5.5-1]". The reader rejects a writing that uses more
 bytes than its value needs, which is one whose last byte is 0
 after a continuation byte. So 0 written as 128, 0 is rejected,
-and so is 128 written as 128, 129, 0. The same rule applies to
-every variable byte integer in a packet: the remaining length,
-property lengths, property identifiers, and variable byte
-integer property values. It is proved for every input: what
-the reader accepts is exactly the printer's writing of the
-value it returns (`Spec.decVBI_canonical`), that writing uses
-the fewest bytes that carry the value, one byte below 2^7, two
-below 2^14, three below 2^21 and four below 2^28
-(`Spec.printVBI_length` and `Spec.decVBI_length`, with the
-count `Spec.vbiSize` written in `Spec/Defs.lean`), and the
-packet reader takes exactly a header byte, that writing of the
-body length, and the body (`Spec.parsePacket_frame`).
+and so is 128 written as 128, 129, 0. The packet reader reads
+every variable byte integer in a packet with this reader: the
+remaining length, property lengths, property identifiers, and
+variable byte integer property values.
+
+What is proved for every input covers the variable byte integer
+reader itself and the remaining length. What the reader accepts
+is exactly the printer's writing of the value it returns
+(`Spec.decVBI_canonical`), and that writing uses the fewest
+bytes that carry the value, one byte below 2^7, two below 2^14,
+three below 2^21 and four below 2^28 (`Spec.printVBI_length`
+and `Spec.decVBI_length`, with the count `Spec.vbiSize` written
+in `Spec/Defs.lean`). The packet reader takes exactly a header
+byte, that writing of the body length, and the body
+(`Spec.parsePacket_frame`), so a longer writing of the
+remaining length is refused for every input.
+
+For the property length, property identifiers and variable byte
+integer property values, no statement covers every input. One
+example input each is proved refused, beside the same packet
+with the shortest writing accepted
+(`Spec.rejects_non_minimal_property_vbis`), and the tests check
+the same cases. The README lists this under What is not proved.
+
+The bytes the printer writes for each value of the worked table
+above, and the values the reader reads from them, are proved for
+those rows (`Spec.vbi_worked_table`). For other values, the
+statements pin the byte count and the round trip, not the
+contents of each byte (seven bits per byte, low groups first);
+the tests check those against the standard's rule.
 
 Paho's Python library (paho-mqtt 2.1.0) accepts the longer
 writings, for example 128, 0 as 0. The test harness records
@@ -364,9 +382,11 @@ specification, and proved for every input from there:
   and the authentication rule (`Spec.property_rule`);
 - the empty PINGREQ and PINGRESP bodies
   (`Spec.empty_body_rule`);
-- the byte count of every variable byte integer,
-  `Spec.vbiSize` (`Spec.printVBI_length`,
-  `Spec.decVBI_length`).
+- the byte count of every variable byte integer the
+  variable byte integer reader accepts, `Spec.vbiSize`
+  (`Spec.printVBI_length`, `Spec.decVBI_length`), and of the
+  remaining length of every packet (with
+  `Spec.parsePacket_frame`).
 
 These are stated for the stream reader; `Spec.parse_whole`
 carries them to the whole input reader. The rules of well
@@ -416,9 +436,12 @@ The printer writes a packet as the fixed header byte, the
 remaining length as a minimal variable byte integer, and the
 body in the layouts above. Property blocks are written with a
 minimal property length, and property identifiers and
-variable byte integer values in their minimal form, which is
-the only form the reader accepts (`Spec.printVBI_length` and
-`Spec.decVBI_length`). Every packet the reader
+variable byte integer values in their minimal form. The
+variable byte integer reader accepts only that form
+(`Spec.printVBI_length` and `Spec.decVBI_length`); for the
+packet reader this is proved for every input on the remaining
+length, and on one example input each for the property
+positions (`Spec.rejects_non_minimal_property_vbis`). Every packet the reader
 accepts reprints byte for byte: the printer's form is the
 only form the reader accepts.
 
@@ -456,8 +479,8 @@ oracle.
 Each property a reader can check in the page (`README.md`)
 names its theorem. The theorems are stated in `Spec.lean` and
 proved in `Proofs/SpecProofs.lean`. The round trip, soundness,
-variable byte integer, frame, four byte cap and rule theorems
-hold for every input; the rule theorems hold the reader to
+variable byte integer (but for the worked table), frame, four
+byte cap and rule theorems hold for every input; the rule theorems hold the reader to
 the rules written in `Spec/Defs.lean`. A row marked "one
 example input", or one that names its inputs, is a theorem
 about those inputs alone; the test harness has a named case
@@ -478,6 +501,8 @@ inputs.
 | For every input, what the variable byte integer reader accepts uses exactly `Spec.vbiSize` bytes for its value, so a longer writing is refused | `Spec.decVBI_length` |
 | Every packet the stream reader takes is a header byte, the printer's writing of the body length (the shortest, by `Spec.printVBI_length`), and that many body bytes, all in the input; the bytes it returns are the ones after them | `Spec.parsePacket_frame` |
 | The remaining length 128, 0 (a two byte writing of 0) is refused, while 0 gives the PINGREQ (every input: `Spec.decVBI_length` with `Spec.parsePacket_frame`) | `Spec.rejects_non_minimal_remaining_length` |
+| A longer writing than the value needs is refused, one example input each, as a property length (128, 0 for 0), a property identifier (129, 0 for 1) and a Subscription Identifier value (129, 128, 0 for 1), while the same packets with the shortest writing are accepted. No statement covers every input in these places | `Spec.rejects_non_minimal_property_vbis` |
+| The printer writes each value of the standard's worked table (0, 127, 128, 16383, 16384, 2097151, 2097152, 268435455) as the bytes the table gives, and the variable byte integer reader reads those bytes as that value (those rows only) | `Spec.vbi_worked_table` |
 | A variable byte integer whose first four bytes all carry a continuation mark is refused, whatever follows | `Spec.decVBI_four_byte_cap` |
 | A packet whose remaining length has a continuation mark on each of its first four bytes is refused, whatever the header byte and whatever follows | `Spec.parsePacket_four_byte_cap` |
 | The whole input reader accepts a byte list exactly when the stream reader takes one packet from it and leaves nothing | `Spec.parse_whole` |

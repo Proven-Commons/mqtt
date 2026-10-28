@@ -87,6 +87,8 @@ covers.
 | For every input, what `decVBI` accepts uses exactly `Spec.vbiSize` bytes for the value it returns. So a writing longer than the value needs, such as 128, 0 for 0 or 128, 129, 0 for 128, is refused (section 1.5.5, MQTT-1.5.5-1). | `Spec.decVBI_length` |
 | Every packet the stream reader `parsePacket` takes is a header byte, the printer's writing of the body length (the shortest, by the row above), and that many body bytes, all standing in the input; the bytes it returns are exactly the ones after them. | `Spec.parsePacket_frame` |
 | The packet 192, 128, 0 (a PINGREQ whose remaining length 0 is written in two bytes) is refused, while 192, 0 is the PINGREQ (every input: `Spec.decVBI_length` with `Spec.parsePacket_frame`). | `Spec.rejects_non_minimal_remaining_length` |
+| A writing longer than the value needs is refused in the other places a variable byte integer stands, one example input each: the PUBLISH 48, 5, 0, 1, 97, 128, 0 (property length 0 written 128, 0), the PUBLISH 48, 7, 0, 1, 97, 3, 129, 0, 1 (property identifier 1 written 129, 0), and the SUBSCRIBE 130, 11, 0, 1, 3, 11, 129, 128, 0, 0, 1, 97, 0 (Subscription Identifier 1 written 129, 128, 0); the same packets with the shortest writing are accepted. No statement covers every input in these places (see What is not proved). | `Spec.rejects_non_minimal_property_vbis` |
+| The printer writes each value of the standard's worked table in section 1.5.5 as the bytes the table gives: 0 as 0, 127 as 127, 128 as 128, 1, 16383 as 255, 127, 16384 as 128, 128, 1, 2097151 as 255, 255, 127, 2097152 as 128, 128, 128, 1, and 268435455 as 255, 255, 255, 127; and `decVBI` reads each of those writings as its value. These rows only. | `Spec.vbi_worked_table` |
 | The variable byte integer reader `decVBI` refuses every input whose first four bytes all carry a continuation mark, whatever follows: the value would need a fifth byte, and four is the limit. | `Spec.decVBI_four_byte_cap` |
 | A packet whose remaining length has a continuation mark on each of its first four bytes is refused, by the stream reader `parsePacket` and by the whole input reader `parse`, whatever the header byte and whatever follows. | `Spec.parsePacket_four_byte_cap` |
 | The whole input reader `parse` accepts a byte list, and returns a packet, exactly when the stream reader `parsePacket` takes that packet from it and leaves no byte after it. So each rule below, stated for `parsePacket`, holds for `parse` too. | `Spec.parse_whole` |
@@ -200,6 +202,30 @@ are about.
   one reason code; and the three DISCONNECT body forms. The tests in
   `tests/` check them, and the example theorems in
   `Proofs/Examples.lean` check some on single inputs.
+- The shortest writing of a variable byte integer inside a
+  property block, for every input. `Spec.decVBI_length`
+  states it for the variable byte integer reader, and
+  `Spec.parsePacket_frame` with it for the remaining length
+  of every packet. For the property length, property
+  identifiers and variable byte integer property values, the
+  packet reader calls the same reader, but no statement says
+  so for every input: `Spec.rejects_non_minimal_property_vbis`
+  covers one example input in each place, and the tests in
+  `tests/run_tests.py` check the cases named "vbi non-minimal
+  ... as property length", "... as property identifier" and
+  "... as subscription identifier".
+- The bytes of a variable byte integer for values outside the
+  standard's worked table. The statements pin how many bytes
+  the printer writes (`Spec.printVBI_length`) and that the
+  reader reads them back (`Spec.decVBI_printVBI`,
+  `Spec.decVBI_canonical`), and `Spec.vbi_worked_table` pins
+  the bytes of the table's eight rows; that every other value
+  is written seven bits per byte, low groups first, rests on
+  the text of `Mqtt.printVBI` and on the tests: the tool
+  reads and prints back Paho's writing of 120 random values
+  below 2^28 as Subscription Identifiers, and the writings of
+  the oracle encoder, written from the standard, in the
+  generated packets.
 - Any reading of what a property means. A property is an
   identifier and a typed value; that a Receive Maximum of
   10 asks the peer to hold back after ten packets is broker

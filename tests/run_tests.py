@@ -779,7 +779,7 @@ def fixed_cases():
     add("vbi non-minimal 129,0 as property identifier",
         bytes([48, 7, 0, 1, 97, 3, 129, 0, 1]), "none")
     add("vbi non-minimal 129,128,0 as subscription identifier",
-        bytes([130, 10, 0, 1, 3, 11, 129, 128, 0, 0, 1, 97, 0]), "none")
+        bytes([130, 11, 0, 1, 3, 11, 129, 128, 0, 0, 1, 97, 0]), "none")
     add("vbi with rest in one packet stream position",
         bytes([192, 0]), want_ok(bytes([192, 0])))
 
