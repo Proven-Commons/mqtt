@@ -56,16 +56,22 @@ follows, and rejects a value cut off by the end of the input.
 The first rule is proved for every input, for the variable
 byte integer reader and for the remaining length of a packet.
 
-Pinned reading, non-minimal encodings: a value may be written
-with more bytes than it needs, as long as the writing uses at
-most four bytes and the value fits. The reader accepts such
-encodings. So 0 written as 128, 0 reads as 0. This matches the
-behaviour of common libraries, including Paho. The printer
-always writes the minimal form, so a packet that arrived with
-a non-minimal remaining length is reprinted with the minimal
-one. The same rule applies to every variable byte integer in
-a packet, including property lengths and variable byte
-integer property values.
+Shortest writing (section 1.5.5): "The encoded value MUST use
+the minimum number of bytes necessary to represent the value
+[MQTT-1.5.5-1]". The reader rejects a writing that uses more
+bytes than its value needs, which is one whose last byte is 0
+after a continuation byte. So 0 written as 128, 0 is rejected,
+and so is 128 written as 128, 129, 0. The same rule applies to
+every variable byte integer in a packet: the remaining length,
+property lengths, property identifiers, and variable byte
+integer property values. It is proved for every input: what
+the reader accepts is exactly the printer's writing of the
+value it returns, and the packet reader takes exactly a header
+byte, the shortest writing of the body length, and the body.
+
+Paho's Python library (paho-mqtt 2.1.0) accepts the longer
+writings, for example 128, 0 as 0. The test harness records
+this as a named difference from that library.
 
 ## Fixed header flags
 
@@ -298,7 +304,9 @@ fields the printer can write exactly. In outline:
 The printer writes a packet as the fixed header byte, the
 remaining length as a minimal variable byte integer, and the
 body in the layouts above. Property blocks are written with a
-minimal property length. A packet read by the reader and
+minimal property length, and property identifiers and
+variable byte integer values in their minimal form, which is
+the only form the reader accepts. A packet read by the reader and
 printed again is in this canonical form; a packet that
 arrived already in canonical form reprints byte for byte.
 
@@ -335,8 +343,9 @@ oracle.
 
 Each property a reader can check in the page (`README.md`)
 names its theorem. The theorems are stated in `Spec.lean`
-and proved in `Proofs/SpecProofs.lean`. The four byte cap
-theorems hold for every input. The other refusal theorems are
+and proved in `Proofs/SpecProofs.lean`. The variable byte
+integer and frame theorems, and the four byte cap theorems,
+hold for every input. The other refusal theorems are
 single inputs, one for each named rejection case in the test
 harness; the tests in `tests/` cover each rule on many more
 inputs.
@@ -346,6 +355,9 @@ inputs.
 | Parsing the printed form of a well formed packet, with more stream bytes after it, gives the packet and those bytes back | `Spec.parsePacket_print` |
 | Parsing the printed form of a well formed packet on its own gives the packet back | `Spec.parse_print` |
 | Reading a printed variable byte integer gives the number back, below 2^28 | `Spec.decVBI_printVBI` |
+| What the variable byte integer reader accepts is the printer's writing of the value it returns, the shortest one, so a longer writing is refused; the value is below 2^28 | `Spec.decVBI_canonical` |
+| Every packet the stream reader takes is a header byte, the shortest writing of the body length, and that many body bytes, all in the input; the bytes it returns are the ones after them | `Spec.parsePacket_frame` |
+| The remaining length 128, 0 (a two byte writing of 0) is refused, while 0 gives the PINGREQ | `Spec.rejects_non_minimal_remaining_length` |
 | A variable byte integer whose first four bytes all carry a continuation mark is refused, whatever follows | `Spec.decVBI_four_byte_cap` |
 | A packet whose remaining length has a continuation mark on each of its first four bytes is refused, whatever the header byte and whatever follows | `Spec.parsePacket_four_byte_cap` |
 | A SUBSCRIBE with flags other than 0010 is refused | `Spec.rejects_subscribe_flags` |

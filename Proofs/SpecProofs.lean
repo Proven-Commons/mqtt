@@ -27,6 +27,22 @@ theorem Spec.decVBI_printVBI (n : Nat) (rest : List UInt8)
   Mqtt.Proofs.decVBI_printVBI n rest hn
 
 
+theorem Spec.decVBI_canonical (bs : List UInt8) (n : Nat) (r : List UInt8)
+    (h : decVBI bs = some (n, r)) :
+    n < 268435456 ∧ bs = printVBI n ++ r :=
+  Mqtt.Proofs.decVBI_canonical bs n r h
+
+theorem Spec.parsePacket_frame (bs : List UInt8) (p : Packet)
+    (r : List UInt8) (h : parsePacket bs = some (p, r)) :
+    ∃ (b : UInt8) (body : List UInt8), body.length < 268435456
+      ∧ bs = b :: (printVBI body.length ++ body) ++ r :=
+  Mqtt.Proofs.parsePacket_frame bs p r h
+
+theorem Spec.rejects_non_minimal_remaining_length :
+    (parse ([192, 128, 0] : List UInt8)).isSome = false
+      ∧ parse ([192, 0] : List UInt8) = some .pingreq := by
+  decide +kernel
+
 theorem Spec.decVBI_four_byte_cap (b0 b1 b2 b3 : UInt8) (rest : List UInt8)
     (h0 : 128 ≤ b0.toNat) (h1 : 128 ≤ b1.toNat) (h2 : 128 ≤ b2.toNat)
     (h3 : 128 ≤ b3.toNat) :

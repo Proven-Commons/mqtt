@@ -44,9 +44,12 @@ theorem vbi_max : decVBI [255, 255, 255, 127] = some (268435455, []) := by
     would need a fifth byte. -/
 theorem vbi_five_bytes : decVBI [255, 255, 255, 255] = none := by decide
 
-/-- The pinned reading: a non minimal encoding within four
-    bytes is accepted. Here 0 carried in two bytes. -/
-theorem vbi_non_minimal : decVBI [128, 0] = some (0, []) := by decide
+/-- A writing longer than the value needs rejects (section
+    1.5.5): here 0 carried in two bytes, and 128 carried in
+    three. -/
+theorem vbi_non_minimal : decVBI [128, 0] = none := by decide
+
+theorem vbi_non_minimal_three : decVBI [128, 129, 0] = none := by decide
 
 /-- The decoder returns the rest of the stream untouched. -/
 theorem vbi_rest : decVBI [128, 1, 99] = some (128, [99]) := by decide

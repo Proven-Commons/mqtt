@@ -42,12 +42,41 @@ theorem Spec.decVBI_printVBI (n : Nat) (rest : List UInt8)
     (hn : n < 268435456) :
     decVBI (printVBI n ++ rest) = some (n, rest) := sorry
 
+/-! ## Variable byte integers and the packet frame
+
+Section 1.5.5 of the standard: "The encoded value MUST use the
+minimum number of bytes necessary to represent the value". -/
+
+/-- What the variable byte integer reader accepts is the
+    printer's writing of the value it returns, which is the
+    shortest one, followed by the bytes it returns; and the
+    value is below 2^28. So a longer writing of a value, such as
+    `[128, 0]` for 0, is refused. -/
+theorem Spec.decVBI_canonical (bs : List UInt8) (n : Nat) (r : List UInt8)
+    (h : decVBI bs = some (n, r)) :
+    n < 268435456 ∧ bs = printVBI n ++ r := sorry
+
+/-- Every packet the stream reader takes is a header byte, the
+    shortest writing of the body's length, and that many body
+    bytes, all standing in the input; the bytes it returns are
+    exactly the ones after them. -/
+theorem Spec.parsePacket_frame (bs : List UInt8) (p : Packet)
+    (r : List UInt8) (h : parsePacket bs = some (p, r)) :
+    ∃ (b : UInt8) (body : List UInt8), body.length < 268435456
+      ∧ bs = b :: (printVBI body.length ++ body) ++ r := sorry
+
+/-- The remaining length `[128, 0]`, a two byte writing of 0, is
+    refused, while its shortest writing `[0]` gives the PINGREQ. -/
+theorem Spec.rejects_non_minimal_remaining_length :
+    (parse ([192, 128, 0] : List UInt8)).isSome = false
+      ∧ parse ([192, 0] : List UInt8) = some .pingreq := sorry
+
 /-! ## The four byte cap
 
 The standard carries a variable byte integer in at most four
 bytes (section 1.5.5). These statements hold for every input, so
 a reader with a higher cap, or none, fails them: on
-`[128, 128, 128, 128, 0]` such a reader returns 0. -/
+`[128, 128, 128, 128, 1]` such a reader returns 2^28. -/
 
 /-- A variable byte integer whose first four bytes all carry a
     continuation mark is refused, whatever follows. -/

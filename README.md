@@ -60,6 +60,9 @@ where they end in `sorry`) and proved in
 | Parsing the printed form of a well formed packet, with more stream bytes after it, gives the packet and those bytes back. | `Spec.parsePacket_print` |
 | Parsing the printed form of a well formed packet on its own gives the packet back. | `Spec.parse_print` |
 | Reading a printed variable byte integer gives the number back, for every value below 2^28. | `Spec.decVBI_printVBI` |
+| What the variable byte integer reader `decVBI` accepts is exactly the printer's writing of the value it returns, which is the shortest writing, followed by the bytes it returns; the value is below 2^28. So a writing longer than the value needs, such as 128, 0 for 0, is refused (section 1.5.5, MQTT-1.5.5-1). | `Spec.decVBI_canonical` |
+| Every packet the stream reader `parsePacket` takes is a header byte, the shortest writing of the body length, and that many body bytes, all standing in the input; the bytes it returns are exactly the ones after them. | `Spec.parsePacket_frame` |
+| The packet 192, 128, 0 (a PINGREQ whose remaining length 0 is written in two bytes) is refused, while 192, 0 is the PINGREQ. | `Spec.rejects_non_minimal_remaining_length` |
 | The variable byte integer reader `decVBI` refuses every input whose first four bytes all carry a continuation mark, whatever follows: the value would need a fifth byte, and four is the limit. | `Spec.decVBI_four_byte_cap` |
 | A packet whose remaining length has a continuation mark on each of its first four bytes is refused, by the stream reader `parsePacket` and by the whole input reader `parse`, whatever the header byte and whatever follows. | `Spec.parsePacket_four_byte_cap` |
 | A SUBSCRIBE packet with flags 0000 is refused: the value the standard fixes is 0010. | `Spec.rejects_subscribe_flags` |
@@ -110,20 +113,13 @@ are about.
 
 - That the reader accepts every byte string the standard
   allows, and rejects every one it forbids. The round trips
-  do not need either. The four byte cap theorems hold for
-  every input, but the other refusal theorems pin single
-  inputs only, so neither holds in general as a proof. The
+  do not need either. The variable byte integer, frame and
+  four byte cap theorems hold for every input, but the other
+  refusal theorems pin single inputs only, so neither holds
+  in general as a proof. The
   oracle differential and the mutation tests in `tests/`
   check that behaviour instead, and the results file
   records the outcome, including any failure.
-- The pinned reading of the variable byte integer: an
-  encoding that uses more bytes than the value needs is
-  accepted, as long as it fits in four bytes. Section
-  1.5.5 of the standard states the shortest form as a
-  requirement on senders; this reader accepts the longer
-  forms, and the printer always writes the shortest. The
-  reading is pinned in `SPEC.md`, and it is a reading, not
-  a proof.
 - Any reading of what a property means. A property is an
   identifier and a typed value; that a Receive Maximum of
   10 asks the peer to hold back after ten packets is broker

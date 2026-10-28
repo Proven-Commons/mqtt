@@ -11,22 +11,24 @@ Layers, all settled against independent expectations:
 
 2. A differential against a strict oracle written here from
    the standard and from SPEC.md (including the pinned
-   readings: non-minimal variable byte integers within four
-   bytes are accepted, and the DISCONNECT body of length 1 is
-   a reason code with an empty property block): random packets
-   of all seven types with varied properties are encoded by
-   the oracle, read by the Lean tool, and the answer must be
-   the canonical reprint.
+   reading that the DISCONNECT body of length 1 is a reason
+   code with an empty property block): random packets of all
+   seven types with varied properties are encoded by the
+   oracle, read by the Lean tool, and the answer must be the
+   canonical reprint.
 
 3. A cross-check against Paho's Python library when it is
-   importable: its variable byte integer encoder must match
-   the oracle's, and property blocks it packs for PUBLISH are
-   read by the oracle, wrapped in packets, and fed to the Lean
-   tool. When the library is absent, the run says so and the
-   oracle carries accept and reject alone. The Mosquitto test
-   suite is a separate program, not a Python library; the run
-   checks for its binary and the results file states whether
-   it was present.
+   importable: variable byte integers written by its encoder
+   are fed to the Lean tool as Subscription Identifiers, and
+   property blocks it packs for PUBLISH are read by the
+   oracle, wrapped in packets, and fed to the Lean tool. Its
+   decoder accepts writings longer than the value needs, which
+   MQTT-1.5.5-1 forbids; the run records that as a named
+   difference. When the library is absent, the run says so and
+   the oracle carries accept and reject alone. The Mosquitto
+   test suite is a separate program, not a Python library; the
+   run checks for its binary and the results file states
+   whether it was present.
 
 Mutations of rich packets (truncation at every length, byte
 flips at every position) and a list of named rejection cases
@@ -54,6 +56,7 @@ EXE = os.path.join(ROOT, ".lake", "build", "bin", "mqtt")
 SEED = 20261026
 
 failures = []
+paho_named = []
 
 
 def check(cond, label, detail=""):
@@ -133,18 +136,22 @@ def enc_vbi(n):
 
 
 def dec_vbi(bs, i):
-    acc = 0
+    """Section 1.5.5: at most four bytes, and the writing must be
+    the shortest one for its value [MQTT-1.5.5-1], checked here
+    by writing the value again and comparing."""
+    start = i
+    value = 0
     mult = 1
-    for k in range(4):
+    for _ in range(4):
         if i >= len(bs):
             raise Reject()
         b = bs[i]
         i += 1
+        value += (b % 128) * mult
         if b < 128:
-            return acc + mult * b, i
-        if k == 3:
-            raise Reject()
-        acc += mult * (b - 128)
+            if enc_vbi(value) != bytes(bs[start:i]):
+                raise Reject()
+            return value, i
         mult *= 128
     raise Reject()
 
@@ -634,11 +641,20 @@ def fixed_cases():
             check(list(bs[1:1 + len(enc_vbi(value))]) == list(enc_vbi(value)),
                   f"fixed/remaining length {value}", "header bytes differ")
             add(f"remaining length {value}", bs)
-    # The pinned reading: a non-minimal encoding within four bytes
-    # is accepted, and reprints in the minimal form.
+    # Section 1.5.5: a writing longer than the value needs is
+    # refused, wherever a variable byte integer stands.
+    add("vbi non-minimal 134,0 as remaining length",
+        bytes([48, 134, 0, 0, 1, 97, 0, 1, 2]), "none")
     add("vbi non-minimal 128,0 as remaining length",
-        bytes([48, 134, 0, 0, 1, 97, 0, 1, 2]),
-        want_ok(bytes([48, 6, 0, 1, 97, 0, 1, 2])))
+        bytes([192, 128, 0]), "none")
+    add("vbi non-minimal 128,128,0 as remaining length",
+        bytes([192, 128, 128, 0]), "none")
+    add("vbi non-minimal 128,0 as property length",
+        bytes([48, 5, 0, 1, 97, 128, 0]), "none")
+    add("vbi non-minimal 129,0 as property identifier",
+        bytes([48, 7, 0, 1, 97, 3, 129, 0, 1]), "none")
+    add("vbi non-minimal 129,128,0 as subscription identifier",
+        bytes([130, 10, 0, 1, 3, 11, 129, 128, 0, 0, 1, 97, 0]), "none")
     add("vbi with rest in one packet stream position",
         bytes([192, 0]), want_ok(bytes([192, 0])))
 
@@ -725,21 +741,35 @@ def paho_section(rng, count_props):
     entries = []
     total = 0
     agree = 0
-    block_agree = 0
 
-    values = [v for v, _ in VBI_TABLE]
-    values += [rng.randrange(1 << 28) for _ in range(120)]
+    # Paho's writing of each value, as the Subscription Identifier
+    # of a SUBSCRIBE: the Lean tool must accept the packet and
+    # print the same bytes back. Value 0 is left out: it is not a
+    # valid Subscription Identifier.
+    values = [v for v, _ in VBI_TABLE if v != 0]
+    values += [rng.randrange(1, 1 << 28) for _ in range(120)]
     for v in values:
+        enc = bytes(VariableByteIntegers.encode(v))
+        block = bytes([11]) + enc
+        body = be16(1) + enc_vbi(len(block)) + block + enc_str("a") + b"\x00"
+        bs = raw_packet(0x82, body)
+        idx = tool.ask(req(bs))
+        entries.append((idx, want_ok(bs)))
         total += 1
-        if bytes(VariableByteIntegers.encode(v)) == enc_vbi(v):
-            agree += 1
-        else:
-            check(False, "paho vbi", f"encode {v} differs")
+    # Paho's decoder on the longer writing 128, 0 of the value 0.
+    # The standard forbids that writing [MQTT-1.5.5-1]; the Lean
+    # tool must refuse it as a remaining length, and Paho's
+    # answer is recorded, not taken.
+    paho_named.append(
+        "paho-mqtt's VariableByteIntegers.decode reads the longer "
+        "writing 128, 0 as "
+        f"{VariableByteIntegers.decode(bytes([128, 0]))!r} (value, "
+        "bytes read); this reader refuses that writing, as "
+        "MQTT-1.5.5-1 requires, so the run does not take Paho's "
+        "answer there.")
+    idx = tool.ask(req(bytes([192, 128, 0])))
+    entries.append((idx, "none"))
     total += 1
-    if VariableByteIntegers.decode(bytes([128, 0])) == (0, 2):
-        agree += 1
-    else:
-        check(False, "paho vbi", "non-minimal decode differs")
 
     attr = {0x01: "PayloadFormatIndicator", 0x02: "MessageExpiryInterval",
             0x03: "ContentType", 0x08: "ResponseTopic",
@@ -772,12 +802,10 @@ def paho_section(rng, count_props):
             okshape = j == len(packed)
         except Reject:
             okshape = False
-        total += 1
         if not okshape or enc_props(parsed) != packed:
             check(False, "paho properties",
                   f"oracle cannot read paho block {list(packed)}")
             continue
-        block_agree += 1
         pkt = ("publish", False, 1, False, "paho/topic", 7, parsed,
                b"\x10\x20")
         bs = enc_packet(pkt)
@@ -785,14 +813,12 @@ def paho_section(rng, count_props):
         entries.append((idx, want_ok(bs)))
         total += 1
     answers = tool.run()
-    packet_agree = 0
     for idx, expected in entries:
         if answers[idx] == expected:
-            packet_agree += 1
+            agree += 1
         else:
             check(False, "paho packet",
                   f"got {answers[idx]}, want {expected}")
-    agree += block_agree + packet_agree
     return total, agree
 
 
@@ -974,15 +1000,12 @@ def main():
     except ImportError:
         paho_present = False
         paho_version = None
-    named = []
+    named = paho_named
     if paho_present:
         n_pa, a_pa = paho_section(rng, 250)
         sections.append((f"Paho {paho_version} cross-check (variable byte "
-                         "integers and PUBLISH property blocks)",
-                         n_pa, a_pa))
-        named.append("Paho's variable byte integer decoder also accepts "
-                     "the non-minimal encoding 128, 0 as the value 0, "
-                     "matching the pinned reading in SPEC.md.")
+                         "integers as Subscription Identifiers, and "
+                         "PUBLISH property blocks)", n_pa, a_pa))
 
     n_mut, a_mut = mutation_cases(rng)
     sections.append(("Mutations and named rejections, settled by the "

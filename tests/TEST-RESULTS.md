@@ -8,13 +8,13 @@ Mosquitto was NOT present on this machine (no `mosquitto` or `mosquitto_sub` bin
 
 | Section | Inputs | Agreements |
 | --- | --- | --- |
-| Fixed cases (spec VBI table, one packet per type, richer hand built packets) | 30 | 30 |
+| Fixed cases (spec VBI table, one packet per type, richer hand built packets) | 35 | 35 |
 | Oracle differential, random packets of all seven types (seed 20261026) | 3000 | 3000 |
-| Paho 2.1.0 cross-check (variable byte integers and PUBLISH property blocks) | 629 | 629 |
+| Paho 2.1.0 cross-check (variable byte integers as Subscription Identifiers, and PUBLISH property blocks) | 378 | 378 |
 | Mutations and named rejections, settled by the oracle | 260 | 260 |
 | Line protocol cases | 9 | 9 |
 
 Named differences from the oracles:
-- Paho's variable byte integer decoder also accepts the non-minimal encoding 128, 0 as the value 0, matching the pinned reading in SPEC.md.
+- paho-mqtt's VariableByteIntegers.decode reads the longer writing 128, 0 as (0, 2) (value, bytes read); this reader refuses that writing, as MQTT-1.5.5-1 requires, so the run does not take Paho's answer there.
 
 Failures: none.

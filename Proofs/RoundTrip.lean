@@ -76,74 +76,141 @@ theorem printVBI_pos : ∀ (n : Nat), 0 < (printVBI n).length := by
 /-- Reading a printed variable byte integer, with the counting
     form of the reader: with at most `k + 1` bytes to spend and
     a value that fits in `k + 1` groups, the reader returns the
-    accumulated value and leaves the bytes after the writing.
-    Induction on `k`: a value below 128 is one byte, and a
-    larger value is its low group, marked as continued, in
-    front of the writing of the rest of the value. -/
-theorem decVBIGo_printVBI : ∀ (k : Nat) (n acc mult : Nat) (rest : List UInt8),
+    value and leaves the bytes after the writing. Induction on
+    `k`: a value below 128 is one byte, and a larger value is
+    its low group, marked as continued, in front of the writing
+    of the rest of the value, which is not 0. -/
+theorem decVBIGo_printVBI : ∀ (k : Nat) (n : Nat) (rest : List UInt8),
     n < 128 ^ (k + 1) →
-    decVBIGo (k + 1) acc mult (printVBI n ++ rest) = some (acc + mult * n, rest) := by
+    decVBIGo (k + 1) (printVBI n ++ rest) = some (n, rest) := by
   intro k
   induction k with
   | zero =>
-    intro n acc mult rest hn
+    intro n rest hn
     rw [Nat.pow_one] at hn
-    rw [printVBI_def, if_pos hn]
-    show decVBIGo 1 acc mult (n.toUInt8 :: rest) = some (acc + mult * n, rest)
-    rw [decVBIGo, if_pos (by rw [toNat_toUInt8 (by omega : n < 256)]; exact hn),
-      toNat_toUInt8 (by omega : n < 256)]
+    rw [printVBI_def, ite_eq_left hn]
+    show decVBIGo 1 (n.toUInt8 :: rest) = some (n, rest)
+    rw [decVBIGo, toNat_toUInt8 (by omega : n < 256), ite_eq_left hn]
   | succ k ih =>
-    intro n acc mult rest hn
+    intro n rest hn
     by_cases h1 : n < 128
-    · rw [printVBI_def, if_pos h1]
-      show decVBIGo (k + 2) acc mult (n.toUInt8 :: rest) = some (acc + mult * n, rest)
-      rw [decVBIGo, if_pos (by rw [toNat_toUInt8 (by omega : n < 256)]; exact h1),
-        toNat_toUInt8 (by omega : n < 256)]
-    · have hmod : n % 128 < 128 := Nat.mod_lt _ (by decide)
-      rw [printVBI_def, if_neg h1]
-      show decVBIGo (k + 2) acc mult
-          ((128 + n % 128).toUInt8 :: (printVBI (n / 128) ++ rest)) =
-        some (acc + mult * n, rest)
-      rw [decVBIGo, toNat_toUInt8 (by omega : 128 + n % 128 < 256),
-        if_neg (by omega : ¬ (128 + n % 128 < 128)),
-        if_neg (by omega : ¬ k + 2 ≤ 1), Nat.add_sub_cancel_left]
-      show decVBIGo (k + 1) (acc + mult * (n % 128)) (mult * 128)
-          (printVBI (n / 128) ++ rest) = some (acc + mult * n, rest)
+    · rw [printVBI_def, ite_eq_left h1]
+      show decVBIGo (k + 2) (n.toUInt8 :: rest) = some (n, rest)
+      rw [decVBIGo, toNat_toUInt8 (by omega : n < 256), ite_eq_left h1]
+    · rw [printVBI_def, ite_eq_right h1]
+      show decVBIGo (k + 2) ((128 + n % 128).toUInt8 :: (printVBI (n / 128) ++ rest))
+        = some (n, rest)
       have hdiv : n / 128 < 128 ^ (k + 1) := by
         rw [Nat.pow_succ] at hn
         omega
-      rw [ih (n / 128) (acc + mult * (n % 128)) (mult * 128) rest hdiv]
-      have key : acc + mult * (n % 128) + mult * 128 * (n / 128) = acc + mult * n := by
-        have h := Nat.mod_add_div n 128
-        have h3 : mult * (n % 128) + mult * 128 * (n / 128) = mult * n := by
-          rw [Nat.mul_assoc, ← Nat.left_distrib, h]
-        omega
+      rw [decVBIGo, toNat_toUInt8 (by omega : 128 + n % 128 < 256),
+        ite_eq_right (by omega : ¬ (128 + n % 128 < 128)), ih (n / 128) rest hdiv]
+      simp only []
+      rw [ite_eq_right (by omega : ¬ (n / 128 = 0))]
+      have key : 128 + n % 128 - 128 + 128 * (n / 128) = n := by omega
       rw [key]
 
 /-- Reading a printed variable byte integer gives the number
     back: any number below 2^28, the most four bytes carry. -/
 theorem decVBI_printVBI (n : Nat) (rest : List UInt8) (hn : n < 268435456) :
-    decVBI (printVBI n ++ rest) = some (n, rest) := by
-  have e : (128 : Nat) ^ (3 + 1) = 268435456 := by decide
-  rw [← e] at hn
-  have h := decVBIGo_printVBI 3 n 0 1 rest hn
-  simpa [decVBI] using h
+    decVBI (printVBI n ++ rest) = some (n, rest) :=
+  decVBIGo_printVBI 3 n rest (by
+    have e : (128 : Nat) ^ (3 + 1) = 268435456 := by decide
+    rw [e]; exact hn)
+
+/-- A byte read as a number and written back is the same
+    byte. -/
+theorem byte_eq_toUInt8 (b : UInt8) : b.toNat.toUInt8 = b := UInt8.ofNat_toNat
+
+/-- What the counting reader accepts is a printed writing: with
+    `k` bytes to spend, an accepted value fits in `k` groups,
+    and the bytes it read are exactly the printer's writing of
+    that value, with the returned bytes after them. Induction
+    on `k`: one byte below 128 is the writing of its value; a
+    continuation byte in front of the writing of a nonzero rest
+    is the writing of the whole value. -/
+theorem decVBIGo_canonical : ∀ (k : Nat) (bs : List UInt8) (n : Nat) (r : List UInt8),
+    decVBIGo k bs = some (n, r) → n < 128 ^ k ∧ bs = printVBI n ++ r := by
+  intro k
+  induction k with
+  | zero =>
+    intro bs n r h
+    rw [decVBIGo] at h
+    exact absurd h (by simp)
+  | succ k ih =>
+    intro bs n r h
+    cases bs with
+    | nil =>
+      rw [decVBIGo] at h
+      exact absurd h (by simp)
+    | cons b bs =>
+      have hb256 : b.toNat < 256 := UInt8.toNat_lt b
+      have hpow : 1 ≤ 128 ^ k := Nat.pow_pos (by decide)
+      rw [decVBIGo] at h
+      by_cases hb : b.toNat < 128
+      · rw [ite_eq_left hb] at h
+        simp only [Option.some.injEq, Prod.mk.injEq] at h
+        obtain ⟨hn, hr⟩ := h
+        subst hn
+        subst hr
+        refine ⟨?_, ?_⟩
+        · rw [Nat.pow_succ]; omega
+        · rw [printVBI_def, ite_eq_left hb, byte_eq_toUInt8]
+          rfl
+      · rw [ite_eq_right hb] at h
+        cases hk : decVBIGo k bs with
+        | none =>
+          rw [hk] at h
+          exact absurd h (by simp)
+        | some vr =>
+          obtain ⟨v, r'⟩ := vr
+          rw [hk] at h
+          simp only [] at h
+          by_cases hv : v = 0
+          · rw [ite_eq_left hv] at h
+            exact absurd h (by simp)
+          · rw [ite_eq_right hv] at h
+            simp only [Option.some.injEq, Prod.mk.injEq] at h
+            obtain ⟨hn, hr⟩ := h
+            subst hn
+            subst hr
+            obtain ⟨hvb, hbs⟩ := ih bs v r' hk
+            refine ⟨?_, ?_⟩
+            · rw [Nat.pow_succ]
+              have : 128 * v ≤ 128 * (128 ^ k - 1) := Nat.mul_le_mul_left _ (by omega)
+              have e2 : 128 * (128 ^ k - 1) = 128 ^ k * 128 - 128 := by
+                rw [Nat.mul_sub, Nat.mul_comm]
+              omega
+            · rw [hbs, printVBI_def (b.toNat - 128 + 128 * v),
+                ite_eq_right (by omega : ¬ (b.toNat - 128 + 128 * v < 128))]
+              have e1 : (b.toNat - 128 + 128 * v) % 128 = b.toNat - 128 := by omega
+              have e2 : (b.toNat - 128 + 128 * v) / 128 = v := by omega
+              rw [e1, e2, show 128 + (b.toNat - 128) = b.toNat by omega, byte_eq_toUInt8]
+              rfl
+
+/-- What the variable byte integer reader accepts is the
+    printer's writing of the value it returns, the shortest
+    one, with the returned bytes after it; and the value is
+    below 2^28. So no longer writing of a value is accepted. -/
+theorem decVBI_canonical (bs : List UInt8) (n : Nat) (r : List UInt8)
+    (h : decVBI bs = some (n, r)) : n < 268435456 ∧ bs = printVBI n ++ r := by
+  have e : (128 : Nat) ^ 4 = 268435456 := by decide
+  rw [← e]
+  exact decVBIGo_canonical 4 bs n r h
 
 /-- The four byte cap: a variable byte integer whose first four
     bytes all carry a continuation mark is refused, whatever
     follows. The value would need a fifth byte, and the
     standard allows four (section 1.5.5). A reader with a
     higher cap, or none, fails this statement on
-    `[128, 128, 128, 128, 0]`. -/
+    `[128, 128, 128, 128, 1]`. -/
 theorem decVBI_four_byte_cap (b0 b1 b2 b3 : UInt8) (rest : List UInt8)
     (h0 : 128 ≤ b0.toNat) (h1 : 128 ≤ b1.toNat) (h2 : 128 ≤ b2.toNat)
     (h3 : 128 ≤ b3.toNat) :
     decVBI (b0 :: b1 :: b2 :: b3 :: rest) = none := by
   unfold decVBI
-  rw [decVBIGo, ite_eq_right (by omega), ite_eq_right (by omega), decVBIGo,
-    ite_eq_right (by omega), ite_eq_right (by omega), decVBIGo,
-    ite_eq_right (by omega), ite_eq_right (by omega), decVBIGo,
-    ite_eq_right (by omega), ite_eq_left (by omega)]
+  rw [decVBIGo, ite_eq_right (by omega), decVBIGo, ite_eq_right (by omega),
+    decVBIGo, ite_eq_right (by omega), decVBIGo, ite_eq_right (by omega), decVBIGo]
 
 /-- The four byte cap on the remaining length: a packet whose
     remaining length has a continuation mark on each of its
@@ -162,6 +229,80 @@ theorem parsePacket_four_byte_cap (h b0 b1 b2 b3 : UInt8) (rest : List UInt8)
   refine ⟨e, ?_⟩
   unfold parse
   rw [e]
+
+/-- What the byte cut takes is exactly `n` bytes from the front,
+    and the returned bytes are the ones after them. -/
+theorem readBytes_inv (n : Nat) (bs seg r : List UInt8)
+    (h : readBytes n bs = some (seg, r)) : seg.length = n ∧ bs = seg ++ r := by
+  unfold readBytes at h
+  by_cases hl : bs.length ≥ n
+  · rw [ite_eq_left hl] at h
+    simp only [Option.some.injEq, Prod.mk.injEq] at h
+    obtain ⟨h1, h2⟩ := h
+    subst h1
+    subst h2
+    refine ⟨?_, (List.take_append_drop n bs).symm⟩
+    rw [List.length_take]
+    omega
+  · rw [ite_eq_right hl] at h
+    exact absurd h (by simp)
+
+/-- The frame of an accepted packet: every packet the stream
+    reader takes is a header byte, the shortest writing of the
+    body's length, and that many body bytes, all standing in
+    the input; the bytes it returns are exactly the ones after
+    them. So the reader never takes a byte the input does not
+    hold, and refuses a remaining length written in more bytes
+    than it needs. -/
+theorem parsePacket_frame (bs : List UInt8) (p : Packet) (r : List UInt8)
+    (h : parsePacket bs = some (p, r)) :
+    ∃ (b : UInt8) (body : List UInt8), body.length < 268435456
+      ∧ bs = b :: (printVBI body.length ++ body) ++ r := by
+  cases bs with
+  | nil => exact absurd h (by simp [parsePacket])
+  | cons b r0 =>
+    cases hd : decVBI r0 with
+    | none =>
+      have : parsePacket (b :: r0) = none := by
+        show (decVBI r0).bind _ = none
+        rw [hd]; rfl
+      rw [this] at h
+      exact absurd h (by simp)
+    | some lr =>
+      obtain ⟨len, r1⟩ := lr
+      obtain ⟨hlen, hr0⟩ := decVBI_canonical r0 len r1 hd
+      cases hb : readBytes len r1 with
+      | none =>
+        have : parsePacket (b :: r0) = none := by
+          show (decVBI r0).bind _ = none
+          rw [hd]
+          show (readBytes len r1).bind _ = none
+          rw [hb]; rfl
+        rw [this] at h
+        exact absurd h (by simp)
+      | some sr =>
+        obtain ⟨seg, r2⟩ := sr
+        obtain ⟨hsl, hr1⟩ := readBytes_inv len r1 seg r2 hb
+        have hr : r2 = r := by
+          have e : parsePacket (b :: r0)
+              = (parseBody (b.toNat / 16) (b.toNat % 16) seg).bind
+                  (fun q => some (q, r2)) := by
+            show (decVBI r0).bind _ = _
+            rw [hd]
+            show (readBytes len r1).bind _ = _
+            rw [hb]
+            rfl
+          rw [e] at h
+          cases hp : parseBody (b.toNat / 16) (b.toNat % 16) seg with
+          | none => rw [hp] at h; exact absurd h (by simp)
+          | some q =>
+            rw [hp] at h
+            simp only [Option.bind_some, Option.some.injEq, Prod.mk.injEq] at h
+            exact h.2
+        subst hr
+        refine ⟨b, seg, by omega, ?_⟩
+        rw [hr0, hr1, hsl]
+        simp
 
 /-! ## Step lemmas
 

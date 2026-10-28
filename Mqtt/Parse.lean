@@ -14,8 +14,8 @@
   - A variable byte integer stops at four bytes: a continuation
     bit on the fourth byte is rejected, and a value cut off by
     the end of the input is rejected. An encoding that uses more
-    bytes than the value needs is accepted, as long as it fits
-    in four bytes (see SPEC.md for this pinned reading).
+    bytes than the value needs is rejected too: its last byte
+    is 0 after a continuation byte (section 1.5.5).
   - A packet type outside the seven this slice covers is
     rejected, and so is a fixed header flags nibble other than
     the one the specification fixes for the type; PUBLISH is
@@ -67,21 +67,29 @@ def readByte : List UInt8 → Option (Nat × List UInt8)
 /-! ## The variable byte integer reader -/
 
 /-- Read a variable byte integer with at most `k` bytes left to
-    spend, accumulating `mult` times the groups still to come.
-    A byte below 128 ends the number. A continuation byte on
-    the last byte the count allows is rejected, and so is the
-    end of the input while a continuation bit stands. -/
-def decVBIGo (k acc mult : Nat) : List UInt8 → Option (Nat × List UInt8)
-  | [] => none
-  | b :: bs =>
-    if b.toNat < 128 then some (acc + mult * b.toNat, bs)
-    else if k ≤ 1 then none
-    else decVBIGo (k - 1) (acc + mult * (b.toNat - 128)) (mult * 128) bs
+    spend. A byte below 128 ends the number. A byte of 128 or
+    more carries the low seven bits of the value and a
+    continuation mark: the bytes after it carry the rest of the
+    value, which counts 128 times. That rest must not be 0: a
+    writing whose last byte is 0 after a continuation byte uses
+    more bytes than the value needs, which section 1.5.5
+    forbids. A continuation byte with no byte left to spend is
+    rejected, and so is the end of the input while a
+    continuation bit stands. -/
+def decVBIGo : Nat → List UInt8 → Option (Nat × List UInt8)
+  | 0, _ => none
+  | _ + 1, [] => none
+  | k + 1, b :: bs =>
+    if b.toNat < 128 then some (b.toNat, bs)
+    else match decVBIGo k bs with
+      | none => none
+      | some (v, r) => if v = 0 then none else some (b.toNat - 128 + 128 * v, r)
 
-/-- Read a variable byte integer (section 2.1.4): at most four
-    bytes. Returns the value and the bytes after it. -/
+/-- Read a variable byte integer (sections 1.5.5 and 2.1.4): at
+    most four bytes, in the fewest bytes the value needs.
+    Returns the value and the bytes after it. -/
 def decVBI (bs : List UInt8) : Option (Nat × List UInt8) :=
-  decVBIGo 4 0 1 bs
+  decVBIGo 4 bs
 
 /-! ## String and binary readers -/
 
