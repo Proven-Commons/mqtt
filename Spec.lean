@@ -42,20 +42,39 @@ theorem Spec.decVBI_printVBI (n : Nat) (rest : List UInt8)
     (hn : n < 268435456) :
     decVBI (printVBI n ++ rest) = some (n, rest) := sorry
 
+/-! ## The four byte cap
+
+The standard carries a variable byte integer in at most four
+bytes (section 1.5.5). These statements hold for every input, so
+a reader with a higher cap, or none, fails them: on
+`[128, 128, 128, 128, 0]` such a reader returns 0. -/
+
+/-- A variable byte integer whose first four bytes all carry a
+    continuation mark is refused, whatever follows. -/
+theorem Spec.decVBI_four_byte_cap (b0 b1 b2 b3 : UInt8) (rest : List UInt8)
+    (h0 : 128 ≤ b0.toNat) (h1 : 128 ≤ b1.toNat) (h2 : 128 ≤ b2.toNat)
+    (h3 : 128 ≤ b3.toNat) :
+    decVBI (b0 :: b1 :: b2 :: b3 :: rest) = none := sorry
+
+/-- A packet whose remaining length has a continuation mark on
+    each of its first four bytes is refused, by the stream reader
+    and by the whole input reader, whatever the header byte and
+    whatever follows. -/
+theorem Spec.parsePacket_four_byte_cap (h b0 b1 b2 b3 : UInt8)
+    (rest : List UInt8)
+    (h0 : 128 ≤ b0.toNat) (h1 : 128 ≤ b1.toNat) (h2 : 128 ≤ b2.toNat)
+    (h3 : 128 ≤ b3.toNat) :
+    parsePacket (h :: b0 :: b1 :: b2 :: b3 :: rest) = none
+      ∧ parse (h :: b0 :: b1 :: b2 :: b3 :: rest) = none := sorry
+
 /-! ## Refused inputs
 
 Single inputs the reader refuses, one for each headline rule of
 `SPEC.md`. Each input is one of the named rejection cases in the
-test harness. The differential tests cover these rules on many
-more inputs; these statements pin them so a reader of the
-specification can check each rule against one concrete case. -/
-
-/-- A remaining length whose fourth byte carries a continuation
-    mark is refused: the value would need a fifth byte, and four
-    is the limit. -/
-theorem Spec.rejects_five_byte_remaining_length :
-    (parse ([192, 255, 255, 255, 255, 127] : List UInt8)).isSome
-      = false := sorry
+test harness. Each statement is about its one input only: the
+differential tests cover these rules on many more inputs, and
+these statements pin them so a reader of the specification can
+check each rule against one concrete case. -/
 
 /-- A SUBSCRIBE packet with flags 0000 is refused: the value the
     standard fixes for SUBSCRIBE is 0010. -/

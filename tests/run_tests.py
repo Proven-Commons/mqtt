@@ -835,6 +835,14 @@ def mutation_cases(rng):
     # fourth byte.
     named.append(("five byte remaining length",
                   bytes([192, 255, 255, 255, 255, 127]), "none"))
+    # The value of these five byte writings fits the input, so a
+    # reader with a cap above four bytes would accept them: they
+    # separate the four byte cap from a plain shortage of input.
+    named.append(("five byte remaining length whose value fits",
+                  bytes([192, 128, 128, 128, 128, 0]), "none"))
+    named.append(("five byte subscription identifier",
+                  bytes([130, 13, 0, 1, 6, 11, 128, 128, 128, 128, 1,
+                         0, 1, 97, 0]), "none"))
     named.append(("remaining length larger than input",
                   bytes([192, 5, 0]), "none"))
     named.append(("remaining length larger than a publish body",

@@ -51,8 +51,10 @@ standard's worked table:
 | 268435455 | 255, 255, 255, 127 |
 
 The reader rejects a value whose fourth byte still carries a
-continuation mark (a fifth byte would be needed), and rejects
-a value cut off by the end of the input.
+continuation mark (a fifth byte would be needed), whatever
+follows, and rejects a value cut off by the end of the input.
+The first rule is proved for every input, for the variable
+byte integer reader and for the remaining length of a packet.
 
 Pinned reading, non-minimal encodings: a value may be written
 with more bytes than it needs, as long as the writing uses at
@@ -333,17 +335,19 @@ oracle.
 
 Each property a reader can check in the page (`README.md`)
 names its theorem. The theorems are stated in `Spec.lean`
-and proved in `Proofs/SpecProofs.lean`. The refusal theorems
-are single inputs, one for each named rejection case in the
-test harness; the tests in `tests/` cover each rule on many
-more inputs.
+and proved in `Proofs/SpecProofs.lean`. The four byte cap
+theorems hold for every input. The other refusal theorems are
+single inputs, one for each named rejection case in the test
+harness; the tests in `tests/` cover each rule on many more
+inputs.
 
 | Property | Theorem |
 |----------|---------|
 | Parsing the printed form of a well formed packet, with more stream bytes after it, gives the packet and those bytes back | `Spec.parsePacket_print` |
 | Parsing the printed form of a well formed packet on its own gives the packet back | `Spec.parse_print` |
 | Reading a printed variable byte integer gives the number back, below 2^28 | `Spec.decVBI_printVBI` |
-| A remaining length needing a fifth byte is refused | `Spec.rejects_five_byte_remaining_length` |
+| A variable byte integer whose first four bytes all carry a continuation mark is refused, whatever follows | `Spec.decVBI_four_byte_cap` |
+| A packet whose remaining length has a continuation mark on each of its first four bytes is refused, whatever the header byte and whatever follows | `Spec.parsePacket_four_byte_cap` |
 | A SUBSCRIBE with flags other than 0010 is refused | `Spec.rejects_subscribe_flags` |
 | A PUBLISH with the reserved QoS value 3 is refused | `Spec.rejects_publish_qos3` |
 | A PUBLISH topic name holding a wildcard is refused | `Spec.rejects_wildcard_topic` |

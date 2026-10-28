@@ -11,7 +11,7 @@ Mosquitto was NOT present on this machine (no `mosquitto` or `mosquitto_sub` bin
 | Fixed cases (spec VBI table, one packet per type, richer hand built packets) | 30 | 30 |
 | Oracle differential, random packets of all seven types (seed 20261026) | 3000 | 3000 |
 | Paho 2.1.0 cross-check (variable byte integers and PUBLISH property blocks) | 629 | 629 |
-| Mutations and named rejections, settled by the oracle | 258 | 258 |
+| Mutations and named rejections, settled by the oracle | 260 | 260 |
 | Line protocol cases | 9 | 9 |
 
 Named differences from the oracles:

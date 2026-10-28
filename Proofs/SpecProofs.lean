@@ -27,10 +27,19 @@ theorem Spec.decVBI_printVBI (n : Nat) (rest : List UInt8)
   Mqtt.Proofs.decVBI_printVBI n rest hn
 
 
-theorem Spec.rejects_five_byte_remaining_length :
-    (parse ([192, 255, 255, 255, 255, 127] : List UInt8)).isSome
-      = false := by
-  decide +kernel
+theorem Spec.decVBI_four_byte_cap (b0 b1 b2 b3 : UInt8) (rest : List UInt8)
+    (h0 : 128 ≤ b0.toNat) (h1 : 128 ≤ b1.toNat) (h2 : 128 ≤ b2.toNat)
+    (h3 : 128 ≤ b3.toNat) :
+    decVBI (b0 :: b1 :: b2 :: b3 :: rest) = none :=
+  Mqtt.Proofs.decVBI_four_byte_cap b0 b1 b2 b3 rest h0 h1 h2 h3
+
+theorem Spec.parsePacket_four_byte_cap (h b0 b1 b2 b3 : UInt8)
+    (rest : List UInt8)
+    (h0 : 128 ≤ b0.toNat) (h1 : 128 ≤ b1.toNat) (h2 : 128 ≤ b2.toNat)
+    (h3 : 128 ≤ b3.toNat) :
+    parsePacket (h :: b0 :: b1 :: b2 :: b3 :: rest) = none
+      ∧ parse (h :: b0 :: b1 :: b2 :: b3 :: rest) = none :=
+  Mqtt.Proofs.parsePacket_four_byte_cap h b0 b1 b2 b3 rest h0 h1 h2 h3
 
 
 theorem Spec.rejects_subscribe_flags :

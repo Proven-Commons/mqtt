@@ -129,6 +129,40 @@ theorem decVBI_printVBI (n : Nat) (rest : List UInt8) (hn : n < 268435456) :
   have h := decVBIGo_printVBI 3 n 0 1 rest hn
   simpa [decVBI] using h
 
+/-- The four byte cap: a variable byte integer whose first four
+    bytes all carry a continuation mark is refused, whatever
+    follows. The value would need a fifth byte, and the
+    standard allows four (section 1.5.5). A reader with a
+    higher cap, or none, fails this statement on
+    `[128, 128, 128, 128, 0]`. -/
+theorem decVBI_four_byte_cap (b0 b1 b2 b3 : UInt8) (rest : List UInt8)
+    (h0 : 128 ≤ b0.toNat) (h1 : 128 ≤ b1.toNat) (h2 : 128 ≤ b2.toNat)
+    (h3 : 128 ≤ b3.toNat) :
+    decVBI (b0 :: b1 :: b2 :: b3 :: rest) = none := by
+  unfold decVBI
+  rw [decVBIGo, ite_eq_right (by omega), ite_eq_right (by omega), decVBIGo,
+    ite_eq_right (by omega), ite_eq_right (by omega), decVBIGo,
+    ite_eq_right (by omega), ite_eq_right (by omega), decVBIGo,
+    ite_eq_right (by omega), ite_eq_left (by omega)]
+
+/-- The four byte cap on the remaining length: a packet whose
+    remaining length has a continuation mark on each of its
+    first four bytes is refused, by the stream reader and by
+    the whole input reader, whatever the header byte and
+    whatever follows. -/
+theorem parsePacket_four_byte_cap (h b0 b1 b2 b3 : UInt8) (rest : List UInt8)
+    (h0 : 128 ≤ b0.toNat) (h1 : 128 ≤ b1.toNat) (h2 : 128 ≤ b2.toNat)
+    (h3 : 128 ≤ b3.toNat) :
+    parsePacket (h :: b0 :: b1 :: b2 :: b3 :: rest) = none
+      ∧ parse (h :: b0 :: b1 :: b2 :: b3 :: rest) = none := by
+  have e : parsePacket (h :: b0 :: b1 :: b2 :: b3 :: rest) = none := by
+    show (decVBI (b0 :: b1 :: b2 :: b3 :: rest)).bind _ = none
+    rw [decVBI_four_byte_cap b0 b1 b2 b3 rest h0 h1 h2 h3]
+    rfl
+  refine ⟨e, ?_⟩
+  unfold parse
+  rw [e]
+
 /-! ## Step lemmas
 
   The readers written with `do` notation are unfolded one step

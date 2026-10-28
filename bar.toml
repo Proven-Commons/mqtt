@@ -7,7 +7,7 @@ name = "mqtt"
 status = "in-progress"
 page = "README.md"
 # GitHub handles of everyone who wrote the specification.
-spec_authors = ["abu-aska"]
+spec_authors = ["abu-aska", "zero-aska"]
 # The program people run. A change to it voids the approval.
 entry_points = ["Main.lean"]
 

@@ -60,7 +60,8 @@ where they end in `sorry`) and proved in
 | Parsing the printed form of a well formed packet, with more stream bytes after it, gives the packet and those bytes back. | `Spec.parsePacket_print` |
 | Parsing the printed form of a well formed packet on its own gives the packet back. | `Spec.parse_print` |
 | Reading a printed variable byte integer gives the number back, for every value below 2^28. | `Spec.decVBI_printVBI` |
-| A remaining length whose fourth byte carries a continuation mark, so the value would need a fifth byte, is refused. | `Spec.rejects_five_byte_remaining_length` |
+| The variable byte integer reader `decVBI` refuses every input whose first four bytes all carry a continuation mark, whatever follows: the value would need a fifth byte, and four is the limit. | `Spec.decVBI_four_byte_cap` |
+| A packet whose remaining length has a continuation mark on each of its first four bytes is refused, by the stream reader `parsePacket` and by the whole input reader `parse`, whatever the header byte and whatever follows. | `Spec.parsePacket_four_byte_cap` |
 | A SUBSCRIBE packet with flags 0000 is refused: the value the standard fixes is 0010. | `Spec.rejects_subscribe_flags` |
 | A PUBLISH packet with the reserved QoS value 3 is refused. | `Spec.rejects_publish_qos3` |
 | A PUBLISH topic name holding a wildcard is refused. | `Spec.rejects_wildcard_topic` |
@@ -109,7 +110,8 @@ are about.
 
 - That the reader accepts every byte string the standard
   allows, and rejects every one it forbids. The round trips
-  do not need either, and the refusal theorems pin single
+  do not need either. The four byte cap theorems hold for
+  every input, but the other refusal theorems pin single
   inputs only, so neither holds in general as a proof. The
   oracle differential and the mutation tests in `tests/`
   check that behaviour instead, and the results file
