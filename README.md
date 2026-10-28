@@ -53,7 +53,10 @@ Each claim below names the theorem behind it. The
 theorems are stated in `Spec.lean` (the challenge file,
 where they end in `sorry`) and proved in
 `Proofs/SpecProofs.lean`, under the same names.
-`comparator.json` lists all of them.
+`comparator.json` lists all of them. A claim that names
+its input, or says "one example input", is proved for
+that input only: the rule it illustrates is tested on
+many more inputs, not proved in general.
 
 | Claim | Theorem |
 |-------|---------|
@@ -65,22 +68,22 @@ where they end in `sorry`) and proved in
 | The packet 192, 128, 0 (a PINGREQ whose remaining length 0 is written in two bytes) is refused, while 192, 0 is the PINGREQ. | `Spec.rejects_non_minimal_remaining_length` |
 | The variable byte integer reader `decVBI` refuses every input whose first four bytes all carry a continuation mark, whatever follows: the value would need a fifth byte, and four is the limit. | `Spec.decVBI_four_byte_cap` |
 | A packet whose remaining length has a continuation mark on each of its first four bytes is refused, by the stream reader `parsePacket` and by the whole input reader `parse`, whatever the header byte and whatever follows. | `Spec.parsePacket_four_byte_cap` |
-| A SUBSCRIBE packet with flags 0000 is refused: the value the standard fixes is 0010. | `Spec.rejects_subscribe_flags` |
-| A PUBLISH packet with the reserved QoS value 3 is refused. | `Spec.rejects_publish_qos3` |
+| The SUBSCRIBE 128, 7, 0, 1, 0, 0, 1, 97, 0, whose flags are 0000 rather than the 0010 the standard fixes, is refused (one example input). | `Spec.rejects_subscribe_flags` |
+| A PUBLISH with the reserved QoS value 3 is refused (one example input, header 0x36). | `Spec.rejects_publish_qos3` |
 | A PUBLISH with the DUP flag set at QoS 0 is refused: here the packet 56, 4, 0, 1, 97, 0 (header 0x38). The same packet with header 0x30 is accepted. | `Spec.rejects_dup_at_qos0` |
 | A PUBLISH with an empty topic name and a Topic Alias (here 48, 6, 0, 0, 3, 35, 0, 1, alias 1) is accepted, and the same packet with no Topic Alias (48, 3, 0, 0, 0) is refused. | `Spec.empty_topic_needs_alias` |
-| A PUBLISH topic name holding a wildcard is refused. | `Spec.rejects_wildcard_topic` |
-| A CONNECT whose protocol name is not `MQTT` is refused. | `Spec.rejects_wrong_protocol_name` |
-| A CONNECT with the reserved bit of the connect flags byte set is refused. | `Spec.rejects_reserved_connect_flag` |
+| A PUBLISH whose topic name is `a/#` is refused (one example input). | `Spec.rejects_wildcard_topic` |
+| A CONNECT whose protocol name is `MQTU`, not `MQTT`, is refused (one example input). | `Spec.rejects_wrong_protocol_name` |
+| A CONNECT whose connect flags byte is 0x03, with the reserved bit 0 set, is refused (one example input). | `Spec.rejects_reserved_connect_flag` |
 | A CONNECT whose will flag is clear but whose will QoS or will retain bit is set is refused: here the connect flags 0x0A and 0x22 on an otherwise valid CONNECT. | `Spec.rejects_will_bits_without_will` |
-| A property standing on a packet type that does not allow it, here a subscription identifier on a CONNECT, is refused. | `Spec.rejects_property_wrong_type` |
-| A single use property standing twice in one block, here the topic alias on a PUBLISH, is refused. | `Spec.rejects_repeated_property` |
+| A CONNECT carrying a Subscription Identifier, which its property block does not allow, is refused (one example input). | `Spec.rejects_property_wrong_type` |
+| A PUBLISH carrying the single use Topic Alias twice is refused (one example input). | `Spec.rejects_repeated_property` |
 | SUBSCRIBE topic filters that break the standard's filter rules are refused, one example input each: `a/#/b` (`#` not last), `a+` (`+` not alone in its level), the empty filter, `$share/g/t` with No Local set, and `$share/g` (no filter after the ShareName). The filters `a/+/#` and `$share/g/t` with No Local clear are accepted. | `Spec.rejects_bad_topic_filters` |
-| A SUBSCRIBE with packet identifier 0 is refused. | `Spec.rejects_subscribe_id_zero` |
+| A SUBSCRIBE with packet identifier 0 is refused (one example input). | `Spec.rejects_subscribe_id_zero` |
 | Property values the standard calls a Protocol Error are refused, one example input each: a Subscription Identifier of 0 on a SUBSCRIBE, a Topic Alias of 0 on a PUBLISH, a Receive Maximum of 0, a Maximum Packet Size of 0, a Request Problem Information of 2, a Request Response Information of 2, and Authentication Data with no Authentication Method on a CONNECT, and a Response Topic `#` and an empty Response Topic on a PUBLISH. | `Spec.rejects_property_value_rules` |
 | The DISCONNECT 224, 1, 0 (a reason code with no property block) reads as that form and prints back as the same three bytes, and the DISCONNECT 224, 2, 0, 0 (a reason code and an empty property block) reads as that form and prints back as the same four bytes. | `Spec.disconnect_short_form` |
-| A PINGREQ with a body is refused: its remaining length must be 0. | `Spec.rejects_pingreq_body` |
-| A packet type outside the seven in this slice, here type 2, is refused. | `Spec.rejects_unknown_type` |
+| The PINGREQ 192, 1, 0, which carries a one byte body, is refused (one example input). | `Spec.rejects_pingreq_body` |
+| The packet 32, 0, of type 2, outside the seven in this slice, is refused (one example input). | `Spec.rejects_unknown_type` |
 
 A packet is well formed when its numbers fit the widths
 that carry them, its strings obey the string rules and fit

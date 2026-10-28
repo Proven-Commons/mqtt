@@ -111,8 +111,8 @@ theorem Spec.rejects_subscribe_flags :
     (parse ([128, 7, 0, 1, 0, 0, 1, 97, 0] : List UInt8)).isSome
       = false := sorry
 
-/-- A PUBLISH packet with QoS 3 is refused: that QoS value is
-    reserved. -/
+/-- A PUBLISH packet with QoS 3, header 0x36, is refused: that
+    QoS value is reserved. -/
 theorem Spec.rejects_publish_qos3 :
     (parse ([54, 7, 0, 1, 97, 0, 1, 0, 120] : List UInt8)).isSome
       = false := sorry
@@ -165,14 +165,14 @@ theorem Spec.rejects_will_bits_without_will :
     ∧ (parse ([16, 14, 0, 4, 77, 81, 84, 84, 5, 34, 0, 0, 0, 0, 1, 120]
       : List UInt8)).isSome = false := sorry
 
-/-- A property standing on a packet type that does not allow it
-    is refused: here a subscription identifier on a CONNECT. -/
+/-- A CONNECT carrying a Subscription Identifier, a property its
+    block does not allow, is refused. -/
 theorem Spec.rejects_property_wrong_type :
     (parse ([16, 16, 0, 4, 77, 81, 84, 84, 5, 2, 0, 0, 2, 11, 5, 0,
       1, 120] : List UInt8)).isSome = false := sorry
 
-/-- A single use property standing twice in one block is
-    refused: here the topic alias on a PUBLISH, twice. -/
+/-- A PUBLISH carrying the single use Topic Alias twice in one
+    block is refused. -/
 theorem Spec.rejects_repeated_property :
     (parse ([50, 12, 0, 1, 97, 0, 3, 6, 35, 0, 1, 35, 0, 2]
       : List UInt8)).isSome = false := sorry
@@ -265,7 +265,7 @@ theorem Spec.disconnect_short_form :
 theorem Spec.rejects_pingreq_body :
     (parse ([192, 1, 0] : List UInt8)).isSome = false := sorry
 
-/-- A packet type outside the seven in this slice is refused:
-    here type 2. -/
+/-- The packet `[32, 0]`, of type 2, outside the seven in this
+    slice, is refused. -/
 theorem Spec.rejects_unknown_type :
     (parse ([32, 0] : List UInt8)).isSome = false := sorry

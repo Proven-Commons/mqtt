@@ -397,7 +397,9 @@ oracle.
 ## Properties and their theorems
 
 Each property a reader can check in the page (`README.md`)
-names its theorem. The theorems are stated in `Spec.lean`
+names its theorem. A row marked "one example input" is proved
+for that input only; the rule it illustrates is checked on
+many more inputs by the tests, not proved in general. The theorems are stated in `Spec.lean`
 and proved in `Proofs/SpecProofs.lean`. The variable byte
 integer and frame theorems, and the four byte cap theorems,
 hold for every input. The other refusal theorems are
@@ -415,19 +417,19 @@ inputs.
 | The remaining length 128, 0 (a two byte writing of 0) is refused, while 0 gives the PINGREQ | `Spec.rejects_non_minimal_remaining_length` |
 | A variable byte integer whose first four bytes all carry a continuation mark is refused, whatever follows | `Spec.decVBI_four_byte_cap` |
 | A packet whose remaining length has a continuation mark on each of its first four bytes is refused, whatever the header byte and whatever follows | `Spec.parsePacket_four_byte_cap` |
-| A SUBSCRIBE with flags other than 0010 is refused | `Spec.rejects_subscribe_flags` |
-| A PUBLISH with the reserved QoS value 3 is refused | `Spec.rejects_publish_qos3` |
-| A PUBLISH with DUP set at QoS 0 is refused (example input: header 0x38), while the same packet with header 0x30 is accepted | `Spec.rejects_dup_at_qos0` |
+| A SUBSCRIBE with flags 0000 rather than 0010 is refused (one example input) | `Spec.rejects_subscribe_flags` |
+| A PUBLISH with the reserved QoS value 3 is refused (one example input) | `Spec.rejects_publish_qos3` |
+| A PUBLISH with DUP set at QoS 0 is refused (one example input, header 0x38), while the same packet with header 0x30 is accepted | `Spec.rejects_dup_at_qos0` |
 | An empty PUBLISH topic name is accepted with a Topic Alias and refused without one (one example input each) | `Spec.empty_topic_needs_alias` |
-| A PUBLISH topic name holding a wildcard is refused | `Spec.rejects_wildcard_topic` |
-| A CONNECT with a protocol name other than `MQTT` is refused | `Spec.rejects_wrong_protocol_name` |
-| A CONNECT with the reserved connect flag bit set is refused | `Spec.rejects_reserved_connect_flag` |
+| A PUBLISH whose topic name is `a/#` is refused (one example input) | `Spec.rejects_wildcard_topic` |
+| A CONNECT whose protocol name is `MQTU` is refused (one example input) | `Spec.rejects_wrong_protocol_name` |
+| A CONNECT with connect flags 0x03, the reserved bit set, is refused (one example input) | `Spec.rejects_reserved_connect_flag` |
 | A CONNECT with the will flag clear and the will QoS or will retain bit set is refused (example inputs: connect flags 0x0A and 0x22) | `Spec.rejects_will_bits_without_will` |
-| A property on a packet type that does not allow it is refused | `Spec.rejects_property_wrong_type` |
-| A single use property standing twice in one block is refused | `Spec.rejects_repeated_property` |
+| A CONNECT carrying a Subscription Identifier, which its block does not allow, is refused (one example input) | `Spec.rejects_property_wrong_type` |
+| A PUBLISH carrying the Topic Alias twice is refused (one example input) | `Spec.rejects_repeated_property` |
 | SUBSCRIBE topic filters that break the filter rules are refused, one example input each: `a/#/b`, `a+`, the empty filter, `$share/g/t` with No Local, and `$share/g`; `a/+/#` and `$share/g/t` without No Local are accepted | `Spec.rejects_bad_topic_filters` |
-| A SUBSCRIBE with packet identifier 0 is refused | `Spec.rejects_subscribe_id_zero` |
+| A SUBSCRIBE with packet identifier 0 is refused (one example input) | `Spec.rejects_subscribe_id_zero` |
 | Property values the standard calls a Protocol Error are refused, one example input each: a Subscription Identifier, Topic Alias, Receive Maximum or Maximum Packet Size of 0, a Request Problem Information or Request Response Information of 2, Authentication Data without an Authentication Method, and a Response Topic that holds a wildcard or is empty | `Spec.rejects_property_value_rules` |
 | A DISCONNECT with a one byte body reads as a reason code with no property block and prints back as the same bytes; one with a reason code and an empty property block does the same in its own form (one example of each) | `Spec.disconnect_short_form` |
-| A PINGREQ with a body is refused | `Spec.rejects_pingreq_body` |
-| A packet type outside the seven in this slice is refused | `Spec.rejects_unknown_type` |
+| A PINGREQ with a one byte body is refused (one example input) | `Spec.rejects_pingreq_body` |
+| The packet 32, 0, of type 2, is refused (one example input) | `Spec.rejects_unknown_type` |
