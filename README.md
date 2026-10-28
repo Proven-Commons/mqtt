@@ -1,6 +1,6 @@
 # mqtt: an MQTT 5.0 packet reader and printer, with a proved round trip
 
-Status: in-progress
+Status: in progress
 
 An MQTT 5.0 control packet reader and printer in Lean,
 covering the seven packet types CONNECT, PUBLISH, SUBSCRIBE,
@@ -45,7 +45,8 @@ protocol.
 fixed cases, the differential run against the harness
 oracle, the Paho cross-check when the library is
 importable, and the mutation and rejection cases, and
-writes the outcome to `tests/TEST-RESULTS.md`.
+writes the outcome to `tests/TEST-RESULTS.md`: the
+oracle, the seed, the input count and the failures.
 
 ## What is proved
 
@@ -177,10 +178,19 @@ are about.
   fidelity of the spec to the standard is a reading, pinned
   in `SPEC.md` where the standard leaves a choice open.
 - The strict oracle in `tests/run_tests.py`, written from
-  the standard, and Paho's Python library in the parts of
-  the differential it covers. Both are evidence, not proof.
-  The results file names the versions used, and states
-  plainly which oracles were and were not available.
+  the standard and `SPEC.md` beside the reader, and Paho's
+  Python library in the parts of the differential it
+  covers. The oracle shares the reader's reading of the
+  standard, though some of its checks are written another
+  way (it checks the shortest variable byte integer by
+  writing the value again, and topic filters by splitting
+  at `/`). Both are evidence, not proof. The results file
+  names the versions used, and states plainly which
+  oracles were and were not available. Paho's decoder
+  accepts variable byte integers longer than the value
+  needs, which section 1.5.5 forbids; the run records that
+  as a named difference and does not take Paho's answer
+  there.
 - The line handling in `Main.lean` (splitting a request
   line, reading decimal codes). The tests drive it, and no
   proof covers it.
@@ -200,10 +210,12 @@ are about.
    differential against the strict oracle, the Paho
    cross-check when the library is importable, and the
    mutation and rejection cases, with counts and any
-   failures written to `tests/TEST-RESULTS.md`. The
-   harness uses the Paho library from the virtual
-   environment in the work directory (`venv`) when it is
-   there, and says so in the results file when it is not.
+   failures written to `tests/TEST-RESULTS.md`. The Paho
+   cross-check runs when the interpreter can import
+   `paho-mqtt` (for example from a virtual environment),
+   and the results file says when it could not. Its inputs
+   are counted apart, so the recorded input count is the
+   same either way.
 3. `lake build`: the library, the proofs, and the tool
    build clean, and `lake env lean Mqtt/Verify.lean`
    prints the axiom list for the round trip theorems.

@@ -1192,7 +1192,12 @@ def main():
         subprocess.run(["lake", "build"], cwd=ROOT, check=True,
                        capture_output=True, text=True, timeout=1200)
     rng = random.Random(SEED)
+    # The sections that run on every machine; their inputs make the
+    # recorded input count. The Paho cross-check needs the paho-mqtt
+    # library, so it is listed apart and left out of that count, and
+    # a run without the library records the same count.
     sections = []
+    extra = []
 
     n_fixed = fixed_cases()
     sections.append(("Fixed cases (spec VBI table, one packet per type, "
@@ -1213,12 +1218,15 @@ def main():
     except ImportError:
         paho_present = False
         paho_version = None
-    named = paho_named
+    # The Paho section draws from its own generator, so whether it
+    # runs does not change the inputs of the sections after it.
     if paho_present:
-        n_pa, a_pa = paho_section(rng, 250)
-        sections.append((f"Paho {paho_version} cross-check (variable byte "
-                         "integers as Subscription Identifiers, and "
-                         "PUBLISH property blocks)", n_pa, a_pa))
+        n_pa, a_pa = paho_section(random.Random(SEED + 1), 250)
+        extra.append((f"Paho {paho_version} cross-check (variable byte "
+                      "integers as Subscription Identifiers, and "
+                      "PUBLISH property blocks; not counted in Inputs)",
+                      n_pa, a_pa))
+    named = paho_named
 
     n_mut, a_mut = mutation_cases(rng)
     sections.append(("Mutations and named rejections, settled by the "
@@ -1228,13 +1236,29 @@ def main():
 
     mosquitto = shutil.which("mosquitto") or shutil.which("mosquitto_sub")
     failed = len(failures)
+    total = sum(t for _, t, _ in sections)
+    oracle = ("the strict reference decoder and encoder in "
+              "tests/run_tests.py, written from the OASIS MQTT Version "
+              "5.0 standard (OASIS Standard, 7 March 2019) and SPEC.md, "
+              f"run on Python {sys.version.split()[0]}")
+    if paho_present:
+        oracle += (f"; with a cross-check against paho-mqtt "
+                   f"{paho_version}, counted apart")
     lines = []
     lines.append("# Test results: mqtt")
     lines.append("")
-    lines.append(f"Seed: {SEED}. Tool: the Lean command line program, "
-                 "one process per section, requests batched. The harness "
-                 "checks parsed structure through the re-encoding the "
-                 "tool prints, together with its own oracle.")
+    lines.append(f"- Oracle: {oracle}")
+    lines.append(f"- Seed: {SEED}")
+    lines.append(f"- Inputs: {total}")
+    lines.append(f"- Failures: {failed}")
+    lines.append("")
+    lines.append("Tool: the Lean command line program, one process per "
+                 "section, requests batched. The harness checks parsed "
+                 "structure through the re-encoding the tool prints, "
+                 "together with its own oracle, and checks that every "
+                 "input the tool accepts among the mutations and named "
+                 "cases reprints byte for byte. Inputs counts the "
+                 "sections that run on every machine.")
     lines.append("")
     if paho_present:
         lines.append(f"Paho's Python library (`paho-mqtt`, version "
@@ -1242,7 +1266,8 @@ def main():
                      "that ran this harness; the Paho cross-check ran. "
                      "It covers variable byte integers and PUBLISH "
                      "property blocks, the pieces the library exposes "
-                     "without a broker.")
+                     "without a broker. Its inputs are listed below and "
+                     "are not part of Inputs.")
     else:
         lines.append("Paho's Python library (`paho-mqtt`) was NOT "
                      "importable in the interpreter that ran this "
@@ -1261,8 +1286,8 @@ def main():
     lines.append("")
     lines.append("| Section | Inputs | Agreements |")
     lines.append("| --- | --- | --- |")
-    for name, total, agree in sections:
-        lines.append(f"| {name} | {total} | {agree} |")
+    for name, n, agree in sections + extra:
+        lines.append(f"| {name} | {n} | {agree} |")
     lines.append("")
     if named:
         lines.append("Named differences from the oracles:")
@@ -1272,15 +1297,12 @@ def main():
         lines.append("Named differences from the oracles: none.")
     lines.append("")
     if failed:
-        lines.append(f"Failures: {failed}.")
+        lines.append("Failures, the first 40:")
         for f in failures[:40]:
             lines.append(f"- {f}")
-    else:
-        lines.append("Failures: none.")
-    lines.append("")
+        lines.append("")
     with open(os.path.join(HERE, "TEST-RESULTS.md"), "w") as fh:
         fh.write("\n".join(lines))
-    total = sum(t for _, t, _ in sections)
     agree = sum(a for _, _, a in sections)
     print(f"sections={len(sections)} inputs={total} agreements={agree} "
           f"failures={failed} paho={'yes ' + str(paho_version) if paho_present else 'no'} "
