@@ -11,8 +11,9 @@ caller can walk a stream of packets. The definitions are in
 `Mqtt/Value.lean` (the packet types, the property table,
 the printer, and the well-formedness rules), `Mqtt/Parse.lean`
 (the reader), and `Mqtt/Utf8.lean` (a strict UTF-8 codec,
-carried in from the Proven Commons `jws` slice with its
-namespace renamed, as the header of that file records). The
+copied from Proven-Commons/jws#2, a draft pull request not
+yet merged, with its namespace renamed; its proof is
+included here as `Proofs/Utf8.lean`). The
 rules are written out in `SPEC.md`. This slice is framing
 only: no broker, no client, and no session behaviour.
 

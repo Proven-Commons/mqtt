@@ -11,10 +11,11 @@
   lead bytes above F4, encodings of the surrogate values D800 to
   DFFF, values above 10FFFF, and truncated sequences.
 
-  This file is carried in from the jws project's Jws/Utf8.lean,
-  written for the Proven Commons jws slice, with the namespace
-  renamed. The repos in this programme do not share a library,
-  so the code travels.
+  This file is copied from Jws/Utf8.lean in Proven-Commons/jws#2,
+  a draft pull request that is not merged (jws main has no such
+  file), with the namespace renamed. The repos in this programme
+  do not share a library, so the code travels. Its proof is
+  included here, in Proofs/Utf8.lean.
 -/
 
 namespace Mqtt.Utf8

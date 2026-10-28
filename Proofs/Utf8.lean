@@ -3,9 +3,10 @@
   claim the packet round trip needs is that decoding the
   encoding of any text gives the text back.
 
-  Carried in with the codec from the Proven Commons jws slice,
-  where this proof was first written, and adapted to the
-  renamed namespace.
+  Copied with the codec from Proven-Commons/jws#2, a draft pull
+  request that is not merged, and adapted here: the namespace is
+  renamed, and a local `toNat_toUInt8` lemma stands in for the
+  jws Base64 import. The proof is checked in this repo.
 -/
 
 import Mqtt.Utf8
