@@ -77,6 +77,13 @@ theorem Spec.rejects_dup_at_qos0 :
   decide +kernel
 
 
+theorem Spec.empty_topic_needs_alias :
+    parse ([48, 6, 0, 0, 3, 35, 0, 1] : List UInt8)
+      = some (.publish ⟨false, 0, false, [], none, [⟨35, .twoByte 1⟩], []⟩)
+    ∧ (parse ([48, 3, 0, 0, 0] : List UInt8)).isSome = false := by
+  decide +kernel
+
+
 theorem Spec.rejects_wildcard_topic :
     (parse ([48, 7, 0, 3, 97, 47, 35, 0, 120] : List UInt8)).isSome
       = false := by

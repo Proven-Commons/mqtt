@@ -227,9 +227,16 @@ identifier as two bytes, present exactly when the QoS is 1 or
 then the payload, which is all the bytes that remain in the
 body, and may be empty.
 
-The topic name must be nonempty and must contain neither
-wildcard character, `+` or `#` (section 4.7.1). A packet
-identifier, where one stands, must not be 0.
+The topic name must contain neither wildcard character, `+`
+or `#` (section 3.3.2.1, [MQTT-3.3.2-2]). It may be empty only
+when the PUBLISH property block carries a Topic Alias (0x23):
+"It is a Protocol Error if the Topic Name is zero length and
+there is no Topic Alias" (section 3.3.2.1). The topic the
+alias stands for is session state, which this slice does not
+keep, so an empty topic with an alias is accepted whatever the
+alias value (other than 0, which the value rules above
+reject). A packet identifier, where one stands, must not be
+0.
 
 ### SUBSCRIBE (section 3.8)
 
@@ -320,9 +327,10 @@ fields the printer can write exactly. In outline:
 - CONNECT: the will, when one stands, has QoS at most 2, a
   well formed will property block, a topic that passes the
   topic name check, and a payload that fits its prefix.
-- PUBLISH: QoS at most 2; DUP clear at QoS 0; a topic that
-  passes the topic name check; a packet identifier standing
-  exactly when the QoS is 1 or 2, and never 0.
+- PUBLISH: QoS at most 2; DUP clear at QoS 0; a topic with no
+  wildcard, empty only when a Topic Alias stands in the
+  properties; a packet identifier standing exactly when the
+  QoS is 1 or 2, and never 0.
 - SUBSCRIBE: a nonzero packet identifier, a nonempty filter
   list, and options with QoS and retain handling at most 2.
 - SUBACK: a nonzero packet identifier and a nonempty reason
@@ -394,6 +402,7 @@ inputs.
 | A SUBSCRIBE with flags other than 0010 is refused | `Spec.rejects_subscribe_flags` |
 | A PUBLISH with the reserved QoS value 3 is refused | `Spec.rejects_publish_qos3` |
 | A PUBLISH with DUP set at QoS 0 is refused (example input: header 0x38), while the same packet with header 0x30 is accepted | `Spec.rejects_dup_at_qos0` |
+| An empty PUBLISH topic name is accepted with a Topic Alias and refused without one (one example input each) | `Spec.empty_topic_needs_alias` |
 | A PUBLISH topic name holding a wildcard is refused | `Spec.rejects_wildcard_topic` |
 | A CONNECT with a protocol name other than `MQTT` is refused | `Spec.rejects_wrong_protocol_name` |
 | A CONNECT with the reserved connect flag bit set is refused | `Spec.rejects_reserved_connect_flag` |

@@ -573,6 +573,23 @@ theorem checkTopic_of_wf {s : List Char} (h : TopicWF s) : checkTopic s = some s
   rw [e1, e2, e3]
   exact if_neg (by decide)
 
+/-- The wildcard check passes on a PUBLISH topic name fit to
+    print. -/
+theorem checkNoWildcards_of_wf {s : List Char} (hp : '+' ∉ s) (hh : '#' ∉ s) :
+    checkNoWildcards s = some s := by
+  unfold checkNoWildcards
+  rw [any_eq_false_of_not_mem hp, any_eq_false_of_not_mem hh]
+  exact ite_eq_right (by decide)
+
+/-- The empty topic check passes on a PUBLISH topic name fit to
+    print: an empty topic comes with a Topic Alias. -/
+theorem pubTopic_alias_ok {s : List Char} {props : List Property}
+    (h : s = [] → hasTopicAlias props = true) :
+    ¬ ((s.isEmpty && !hasTopicAlias props) = true) := by
+  cases s with
+  | nil => rw [h rfl]; decide
+  | cons c t => simp
+
 /-- An `if` on a boolean, in the flags builders' shape, is the
     bit as a number times the place value. -/
 theorem if_bool_mul (b : Bool) (x : Nat) :
@@ -1159,7 +1176,8 @@ theorem readPublishBody_printPublishBody (flags : Nat) (pub : Publish)
     readPublishBody flags (printPublishBody pub) = some pub := by
   obtain ⟨dup, qos, retain, topic, pid, props, payload⟩ := pub
   obtain ⟨hqos, htopic, hidf, hnone, hprops, _⟩ := h
-  have htopic' : TopicWF topic := htopic
+  have htopic' : PubTopicWF topic props := htopic
+  have hcond := pubTopic_alias_ok htopic'.2.2.2
   have hidf' : ∀ id, pid = some id →
       1 ≤ id ∧ id < 65536 ∧ (qos = 1 ∨ qos = 2) := hidf
   have hnone' : pid = none → qos = 0 := hnone
@@ -1173,7 +1191,7 @@ theorem readPublishBody_printPublishBody (flags : Nat) (pub : Publish)
       from rfl,
     readStr_printStr topic _ htopic'.1]
   simp only [Option.bind_some]
-  rw [checkTopic_of_wf htopic']
+  rw [checkNoWildcards_of_wf htopic'.2.1 htopic'.2.2.1]
   simp only [Option.bind_some]
   by_cases hq0 : qos = 0
   · have hpid : pid = none := by
@@ -1187,7 +1205,7 @@ theorem readPublishBody_printPublishBody (flags : Nat) (pub : Publish)
     simp only [Option.bind_some]
     rw [readProps_printProps .publish props payload hprops']
     simp only [Option.bind_some]
-    rw [h3', h0', hq']
+    rw [ite_eq_right hcond, h3', h0', hq']
   · have hpid : ∃ i, pid = some i ∧ 1 ≤ i ∧ i < 65536 := by
       cases hp : pid with
       | none => exact absurd (hnone' hp) hq0
@@ -1199,7 +1217,7 @@ theorem readPublishBody_printPublishBody (flags : Nat) (pub : Publish)
     simp only [Option.bind_some]
     rw [readProps_printProps .publish props payload hprops']
     simp only [Option.bind_some]
-    rw [h3', h0', hq']
+    rw [ite_eq_right hcond, h3', h0', hq']
 
 /-! ## Whole packets -/
 

@@ -238,6 +238,18 @@ def BinWF (bs : List UInt8) : Prop :=
 def TopicWF (s : List Char) : Prop :=
   StrWF s ∧ s ≠ [] ∧ '+' ∉ s ∧ '#' ∉ s
 
+/-- Does a property list carry a Topic Alias (0x23)? -/
+def hasTopicAlias (ps : List Property) : Bool :=
+  ps.any fun p => p.id == 0x23
+
+/-- A PUBLISH topic name fit to print, beside the packet's
+    properties: a string holding neither wildcard character,
+    which may be empty only when the properties carry a Topic
+    Alias that stands for the topic (sections 3.3.2.1 and
+    3.3.2.3.4). -/
+def PubTopicWF (s : List Char) (props : List Property) : Prop :=
+  StrWF s ∧ '+' ∉ s ∧ '#' ∉ s ∧ (s = [] → hasTopicAlias props = true)
+
 /-! ## Field printers -/
 
 /-- Print a string field: the two byte length of its UTF-8
@@ -515,7 +527,7 @@ def ConnectWF (c : Connect) : Prop :=
     DUP flag is clear at QoS 0 (section 3.3.1.1,
     [MQTT-3.3.1-2]). -/
 def PublishWF (p : Publish) : Prop :=
-  p.qos ≤ 2 ∧ TopicWF p.topic
+  p.qos ≤ 2 ∧ PubTopicWF p.topic p.props
     ∧ (∀ id, p.packetId = some id → 1 ≤ id ∧ id < 65536 ∧ (p.qos = 1 ∨ p.qos = 2))
     ∧ (p.packetId = none → p.qos = 0)
     ∧ PropsBlockWF .publish p.props

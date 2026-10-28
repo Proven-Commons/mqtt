@@ -68,6 +68,7 @@ where they end in `sorry`) and proved in
 | A SUBSCRIBE packet with flags 0000 is refused: the value the standard fixes is 0010. | `Spec.rejects_subscribe_flags` |
 | A PUBLISH packet with the reserved QoS value 3 is refused. | `Spec.rejects_publish_qos3` |
 | A PUBLISH with the DUP flag set at QoS 0 is refused: here the packet 56, 4, 0, 1, 97, 0 (header 0x38). The same packet with header 0x30 is accepted. | `Spec.rejects_dup_at_qos0` |
+| A PUBLISH with an empty topic name and a Topic Alias (here 48, 6, 0, 0, 3, 35, 0, 1, alias 1) is accepted, and the same packet with no Topic Alias (48, 3, 0, 0, 0) is refused. | `Spec.empty_topic_needs_alias` |
 | A PUBLISH topic name holding a wildcard is refused. | `Spec.rejects_wildcard_topic` |
 | A CONNECT whose protocol name is not `MQTT` is refused. | `Spec.rejects_wrong_protocol_name` |
 | A CONNECT with the reserved bit of the connect flags byte set is refused. | `Spec.rejects_reserved_connect_flag` |

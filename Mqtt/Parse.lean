@@ -223,9 +223,19 @@ def readFiltersGo : Nat → List UInt8 →
 def flagBit (n k : Nat) : Bool := (n / 2 ^ k) % 2 = 1
 
 /-- A topic name check for a read string: not empty, and
-    neither wildcard character stands in it. -/
+    neither wildcard character stands in it. The will topic
+    takes this check. -/
 def checkTopic (s : List Char) : Option (List Char) :=
   if s.isEmpty || s.any (fun c => decide (c = '+')) || s.any (fun c => decide (c = '#')) then
+    none
+  else some s
+
+/-- The wildcard half of the topic name check, for a PUBLISH
+    topic name, which may be empty when a Topic Alias stands
+    for it: neither wildcard character stands in the text
+    (section 3.3.2.1, [MQTT-3.3.2-2]). -/
+def checkNoWildcards (s : List Char) : Option (List Char) :=
+  if s.any (fun c => decide (c = '+')) || s.any (fun c => decide (c = '#')) then
     none
   else some s
 
@@ -302,13 +312,18 @@ def readPacketId (flags : Nat) (r1 : List UInt8) :
     when the QoS is 1 or 2 (and never 0), the properties, and
     the payload, which is all the bytes that remain in the cut.
     The QoS comes from the fixed header flags; the reserved
-    value 3 has already been turned away by the caller. -/
+    value 3 has already been turned away by the caller. The
+    topic name holds no wildcard, and it may be empty only when
+    the properties carry a Topic Alias (section 3.3.2.1: "It is
+    a Protocol Error if the Topic Name is zero length and there
+    is no Topic Alias"). -/
 def readPublishBody (flags : Nat) (seg : List UInt8) : Option Publish :=
   (readStr seg).bind fun (topic, r1) =>
-  (checkTopic topic).bind fun topic =>
+  (checkNoWildcards topic).bind fun topic =>
   (readPacketId flags r1).bind fun (pid, r2) =>
   (readProps .publish r2).bind fun (props, payload) =>
-  some ⟨flagBit flags 3, (flags / 2) % 4, flagBit flags 0, topic, pid,
+  if topic.isEmpty && !hasTopicAlias props then none
+  else some ⟨flagBit flags 3, (flags / 2) % 4, flagBit flags 0, topic, pid,
     props, payload⟩
 
 /-- Read a SUBSCRIBE body: a nonzero packet identifier, the

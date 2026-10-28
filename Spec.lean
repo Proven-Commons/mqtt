@@ -125,6 +125,17 @@ theorem Spec.rejects_dup_at_qos0 :
     ∧ parse ([48, 4, 0, 1, 97, 0] : List UInt8)
       = some (.publish ⟨false, 0, false, ['a'], none, [], []⟩) := sorry
 
+/-- A PUBLISH with an empty topic name is accepted when its
+    properties carry a Topic Alias, which stands for the topic
+    (sections 3.3.2.1 and 3.3.2.3.4): here Topic Alias 1. The same
+    packet with no property is refused, since "It is a Protocol
+    Error if the Topic Name is zero length and there is no Topic
+    Alias" (section 3.3.2.1). -/
+theorem Spec.empty_topic_needs_alias :
+    parse ([48, 6, 0, 0, 3, 35, 0, 1] : List UInt8)
+      = some (.publish ⟨false, 0, false, [], none, [⟨35, .twoByte 1⟩], []⟩)
+    ∧ (parse ([48, 3, 0, 0, 0] : List UInt8)).isSome = false := sorry
+
 /-- A PUBLISH topic name holding a wildcard is refused: `a/#` is
     a filter, not a topic name. -/
 theorem Spec.rejects_wildcard_topic :

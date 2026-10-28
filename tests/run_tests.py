@@ -426,7 +426,10 @@ def dec_connect(seg):
 
 def dec_publish(flags, seg):
     topic, i = dec_str(seg, 0)
-    check_topic(topic)
+    # No wildcard in a Topic Name [MQTT-3.3.2-2]; an empty one
+    # needs a Topic Alias, checked after the properties (3.3.2.1).
+    if "+" in topic or "#" in topic:
+        raise Reject()
     qos = (flags // 2) % 4
     # DUP is 0 for all QoS 0 messages [MQTT-3.3.1-2].
     if qos == 0 and flagbit(flags, 3):
@@ -437,6 +440,8 @@ def dec_publish(flags, seg):
         if pid == 0:
             raise Reject()
     props, i = dec_props("publish", seg, i)
+    if topic == "" and not any(p == 0x23 for p, _ in props):
+        raise Reject()
     return ("publish", flagbit(flags, 3), qos, flagbit(flags, 0),
             topic, pid, props, bytes(seg[i:]))
 
@@ -619,11 +624,18 @@ def rand_packet(rng):
         qos = rng.choice([0, 1, 2])
         # DUP only at QoS 1 and 2: at QoS 0 it is a forbidden
         # packet, which the named rejection cases cover.
+        props = rand_props(rng, "publish")
+        topic = rand_topic(rng)
+        # Now and then an empty topic name with a Topic Alias,
+        # which section 3.3.2.1 allows.
+        if rng.random() < 0.1:
+            topic = ""
+            if not any(p == 0x23 for p, _ in props):
+                props.append((0x23, rand_prop_value(rng, 0x23)))
         return ("publish", qos != 0 and rng.random() < 0.5, qos,
-                rng.random() < 0.5,
-                rand_topic(rng),
+                rng.random() < 0.5, topic,
                 rng.randint(1, 65535) if qos else None,
-                rand_props(rng, "publish"), rand_bytes(rng, 20))
+                props, rand_bytes(rng, 20))
     if tag == "subscribe":
         filters = [(rand_filter(rng),
                     (rng.randint(0, 2), rng.random() < 0.5,
@@ -952,6 +964,21 @@ def mutation_cases(rng):
     wild_body = enc_str("a/#") + b"\x00" + b"x"
     named.append(("publish wildcard topic",
                   raw_packet(0x30, wild_body), "none"))
+    named.append(("publish wildcard + in topic",
+                  raw_packet(0x30, enc_str("a/+") + b"\x00"), "none"))
+    named.append(("publish empty topic, no topic alias",
+                  raw_packet(0x30, enc_str("") + b"\x00"), "none"))
+    named.append(("publish empty topic, other properties only",
+                  raw_packet(0x30, enc_str("") + enc_props([(0x02, 5)])),
+                  "none"))
+    alias_pub = raw_packet(0x30, enc_str("") + enc_props([(0x23, 1)]))
+    named.append(("publish empty topic with topic alias, accepted",
+                  alias_pub, want_ok(alias_pub)))
+    alias_pub1 = raw_packet(0x32, enc_str("") + be16(9)
+                            + enc_props([(0x26, ("k", "v")), (0x23, 7)])
+                            + b"pay")
+    named.append(("publish qos 1, empty topic with topic alias, accepted",
+                  alias_pub1, want_ok(alias_pub1)))
     badname = (enc_str("MQTU") + bytes([5, 2]) + be16(0) + b"\x00"
                + enc_str("x"))
     named.append(("connect wrong protocol name",

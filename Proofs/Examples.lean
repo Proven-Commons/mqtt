@@ -98,8 +98,14 @@ theorem parse_connect :
     be 0. -/
 theorem parse_pingreq_body : parse [192, 1, 0] = none := by decide
 
-/-- An empty PUBLISH topic rejects. -/
-theorem parse_publish_empty_topic : parse [48, 2, 0, 0] = none := by
+/-- An empty PUBLISH topic with no Topic Alias rejects. -/
+theorem parse_publish_empty_topic : parse [48, 3, 0, 0, 0] = none := by
+  decide
+
+/-- An empty PUBLISH topic with a Topic Alias is accepted. -/
+theorem parse_publish_empty_topic_alias :
+    parse [48, 6, 0, 0, 3, 35, 0, 1]
+      = some (.publish ⟨false, 0, false, [], none, [⟨35, .twoByte 1⟩], []⟩) := by
   decide
 
 /-- A packet type outside this slice rejects, here type 2. -/
