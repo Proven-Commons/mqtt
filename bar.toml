@@ -19,8 +19,9 @@ code = [
   "Mqtt.PropType", "Mqtt.PropVal", "Mqtt.PropVal.byte",
   "Mqtt.PropVal.twoByte", "Mqtt.PropVal.fourByte", "Mqtt.PropVal.varByte",
   "Mqtt.PropVal.utf8", "Mqtt.PropVal.utf8Pair", "Mqtt.PropVal.binary",
-  "Mqtt.Property", "Mqtt.PropSet", "Mqtt.SubOpts", "Mqtt.Will",
-  "Mqtt.Connect", "Mqtt.Publish", "Mqtt.Packet", "Mqtt.Packet.connect",
+  "Mqtt.Property", "Mqtt.Property.mk", "Mqtt.PropSet", "Mqtt.SubOpts",
+  "Mqtt.SubOpts.mk", "Mqtt.Will", "Mqtt.Connect", "Mqtt.Publish",
+  "Mqtt.Publish.mk", "Mqtt.Packet", "Mqtt.Packet.connect",
   "Mqtt.Packet.publish", "Mqtt.Packet.subscribe", "Mqtt.Packet.suback",
   "Mqtt.Packet.pingreq", "Mqtt.Packet.pingresp", "Mqtt.Packet.disconnect",
   # The property table.
@@ -34,8 +35,12 @@ code = [
   "Mqtt.printPublishBody", "Mqtt.printFilter", "Mqtt.printFilters",
   "Mqtt.printSubscribeBody", "Mqtt.printSubackBody", "Mqtt.bodyOf",
   "Mqtt.headerOf", "Mqtt.print",
-  # Well formedness.
+  # Well formedness, and the value, topic and filter rules the
+  # reader and the well formedness share.
   "Mqtt.hasNul", "Mqtt.StrWF", "Mqtt.BinWF", "Mqtt.TopicWF", "Mqtt.ValWF",
+  "Mqtt.propValOK", "Mqtt.authOK", "Mqtt.hasTopicAlias", "Mqtt.PubTopicWF",
+  "Mqtt.splitLevels", "Mqtt.levelOK", "Mqtt.levelsOK", "Mqtt.plainFilterOK",
+  "Mqtt.shareSplit", "Mqtt.filterOK",
   "Mqtt.PropsWF", "Mqtt.PropsBlockWF", "Mqtt.WillWF", "Mqtt.ConnectWF",
   "Mqtt.PublishWF", "Mqtt.OptsWF", "Mqtt.FiltersWF", "Mqtt.PacketFieldsWF",
   "Mqtt.PacketWF",
@@ -48,6 +53,7 @@ code = [
   "Mqtt.readPropVal", "Mqtt.readEntry", "Mqtt.readEntriesGo",
   "Mqtt.readEntries", "Mqtt.readProps", "Mqtt.readOptsByte",
   "Mqtt.readFiltersGo", "Mqtt.flagBit", "Mqtt.checkTopic",
+  "Mqtt.checkNoWildcards",
   "Mqtt.readWillPart", "Mqtt.readOptStrField", "Mqtt.readOptBinField",
   "Mqtt.readConnectBody", "Mqtt.readPacketId", "Mqtt.readPublishBody",
   "Mqtt.readSubscribeBody", "Mqtt.readSubackBody", "Mqtt.readDisconnectBody",
