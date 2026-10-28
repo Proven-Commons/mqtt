@@ -45,7 +45,8 @@ protocol.
 `python3 tests/run_tests.py` rebuilds the tool, runs the
 fixed cases, the differential run against the harness
 oracle, the Paho cross-check when the library is
-importable, and the mutation and rejection cases, and
+importable, the mutation and rejection cases, and random
+packets of each forbidden class drawn from the seed, and
 writes the outcome to `tests/TEST-RESULTS.md`: the
 oracle, the seed, the input count and the failures.
 
@@ -264,7 +265,8 @@ are about.
 2. `python3 tests/run_tests.py`: the fixed cases, the
    differential against the strict oracle, the Paho
    cross-check when the library is importable, and the
-   mutation and rejection cases, with counts and any
+   mutation and rejection cases, and the forbidden classes
+   drawn from the seed, with counts and any
    failures written to `tests/TEST-RESULTS.md`. The Paho
    cross-check runs when the interpreter can import
    `paho-mqtt` (for example from a virtual environment),

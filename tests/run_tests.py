@@ -32,6 +32,18 @@ flips at every position) and a list of named rejection cases
 are settled by comparing the Lean answer with the oracle's
 answer on the same bytes.
 
+Forbidden classes are drawn from the seed as well: random valid
+packets with one rule broken, for every Request Problem
+Information and Request Response Information value from 2 to
+255, the value 0 of the Subscription Identifier, Receive
+Maximum, Topic Alias and Maximum Packet Size, Response Topics
+with a wildcard or empty, Authentication Data without a Method,
+and topic filters of 1 to 6 levels that break a wildcard or
+shared subscription rule. The oracle settles them, and the run
+checks that the oracle's own rule checks (prop_value_ok,
+filter_ok) call each one forbidden. Controls that keep the rule
+must be accepted.
+
 Results are written to tests/TEST-RESULTS.md. Seed 20261026.
 
 Usage: python3 tests/run_tests.py [--skip-build]
@@ -1172,6 +1184,223 @@ def mutation_cases(rng):
     return len(entries), agree
 
 
+# ---------------------------------------------------------------------------
+# Forbidden classes, drawn from the seed.
+# ---------------------------------------------------------------------------
+
+def put_prop(ps, pid, value):
+    """The property list with every (pid, _) removed and (pid,
+    value) put at a random place: the value under test is the
+    only one of its identifier in the block."""
+    out = [(i, v) for i, v in ps if i != pid]
+    return out + [(pid, value)]
+
+
+def packet_with_block(rng, setname, props):
+    """A random valid packet of the kind that carries a `setname`
+    property block, with `props` as that block."""
+    if setname in ("connect", "will"):
+        will = (rng.randint(0, 2), rng.random() < 0.5,
+                rand_props(rng, "will"), rand_topic(rng), rand_bytes(rng))
+        cprops = rand_props(rng, "connect")
+        if setname == "connect":
+            cprops = props
+            if rng.random() < 0.5:
+                will = None
+        else:
+            will = (will[0], will[1], props, will[3], will[4])
+        return ("connect", rng.random() < 0.5, rng.randrange(65536), cprops,
+                rand_text(rng, 0, 6), will,
+                rand_text(rng, 1, 5) if rng.random() < 0.4 else None,
+                rand_bytes(rng, 6) if rng.random() < 0.4 else None)
+    if setname == "publish":
+        qos = rng.choice([0, 1, 2])
+        return ("publish", qos != 0 and rng.random() < 0.5, qos,
+                rng.random() < 0.5, rand_topic(rng),
+                rng.randint(1, 65535) if qos else None, props,
+                rand_bytes(rng, 10))
+    if setname == "subscribe":
+        return ("subscribe", rng.randint(1, 65535), props,
+                [(rand_filter(rng), (rng.randint(0, 2), False,
+                                     rng.random() < 0.5, rng.randint(0, 2)))
+                 for _ in range(rng.randint(1, 3))])
+    raise ValueError(setname)
+
+
+def wild_topic(rng):
+    """A topic name with `+` or `#` put in at a random place."""
+    t = rand_topic(rng)
+    k = rng.randint(0, len(t))
+    return t[:k] + rng.choice("+#") + t[k:]
+
+
+def safe_level(rng):
+    return "".join(rng.choice("abcXYZ019._-") for _ in range(rng.randint(1, 4)))
+
+
+def good_plain_filter(rng):
+    n = rng.randint(1, 6)
+    parts = [rng.choice(["+", safe_level(rng)]) for _ in range(n)]
+    if rng.random() < 0.4:
+        parts[-1] = "#"
+    return "/".join(parts)
+
+
+def bad_plain_filter(rng):
+    """A filter of 1 to 6 levels that breaks a wildcard rule:
+    `#` as a whole level other than the last, or `+` or `#`
+    inside a level beside other characters."""
+    kind = rng.choice(["hash_not_last", "plus_in_level", "hash_in_level"])
+    if kind == "hash_not_last":
+        n = rng.randint(2, 6)
+        parts = [rng.choice(["+", safe_level(rng)]) for _ in range(n)]
+        parts[rng.randint(0, n - 2)] = "#"
+        return kind, "/".join(parts)
+    n = rng.randint(1, 6)
+    parts = [rng.choice(["+", safe_level(rng)]) for _ in range(n)]
+    lvl = safe_level(rng)
+    k = rng.randint(0, len(lvl))
+    ch = "+" if kind == "plus_in_level" else "#"
+    parts[rng.randrange(n)] = lvl[:k] + ch + lvl[k:]
+    return kind, "/".join(parts)
+
+
+def bad_filter(rng):
+    """A filter that breaks a rule of sections 4.7.1, 4.7.3 or
+    4.8.2, with the No Local option to send it with."""
+    kind = rng.choice(["plain", "plain", "plain", "share_name_empty",
+                       "share_name_wild", "share_no_slash",
+                       "share_empty_filter", "share_bad_filter",
+                       "share_no_local", "empty"])
+    name = safe_level(rng)
+    if kind == "plain":
+        return bad_plain_filter(rng) + (rng.random() < 0.5,)
+    if kind == "share_name_empty":
+        return kind, "$share//" + good_plain_filter(rng), False
+    if kind == "share_name_wild":
+        k = rng.randint(0, len(name))
+        return kind, ("$share/" + name[:k] + rng.choice("+#") + name[k:]
+                      + "/" + good_plain_filter(rng)), False
+    if kind == "share_no_slash":
+        return kind, "$share/" + name, False
+    if kind == "share_empty_filter":
+        return kind, "$share/" + name + "/", False
+    if kind == "share_bad_filter":
+        return kind, "$share/" + name + "/" + bad_plain_filter(rng)[1], False
+    if kind == "share_no_local":
+        return kind, "$share/" + name + "/" + good_plain_filter(rng), True
+    return kind, "", False
+
+
+def forbidden_cases(rng):
+    """Inputs of each forbidden class, drawn from the seed: every
+    Request Problem Information and Request Response Information
+    value from 2 to 255, the value 0 for the Subscription
+    Identifier, Receive Maximum, Topic Alias and Maximum Packet
+    Size, Response Topics that hold a wildcard or are empty,
+    Authentication Data without a Method, and topic filters of 1
+    to 6 levels that break a wildcard or shared subscription
+    rule. Each is a random valid packet with one rule broken.
+    The oracle settles each answer, and the run checks that the
+    oracle (prop_value_ok, filter_ok) does call each one
+    forbidden; about one in five comes with a control, the same
+    packet with the rule kept, which must be accepted."""
+    tool = Tool()
+    entries = []
+
+    def add(label, bs, forbidden):
+        want = settled_answer(bs)
+        if forbidden:
+            check(want == "none", f"forbidden/{label}",
+                  f"the oracle accepts {list(bs)}, which the generator "
+                  "meant to break a rule")
+        else:
+            check(want != "none", f"forbidden/{label}",
+                  f"the oracle refuses the control {list(bs)}")
+        idx = tool.ask(req(bs))
+        entries.append((label, idx, want, bs))
+
+    def value_case(label, setname, pid, bad, good):
+        base = rand_props(rng, setname)
+        if pid == 0x16:
+            base = [(i, v) for i, v in base if i not in (0x15, 0x16)]
+        seed_state = rng.getstate()
+        pkt = packet_with_block(rng, setname, put_prop(base, pid, bad))
+        add(label, enc_packet(pkt), True)
+        if rng.random() < 0.2:
+            # The same draws again, so the control differs from the
+            # case in the value under test alone (for Authentication
+            # Data, in an added Authentication Method).
+            rng2 = random.Random()
+            rng2.setstate(seed_state)
+            good_props = (put_prop(base, pid, bad) + [(0x15, "m")]
+                          if pid == 0x16 else put_prop(base, pid, good))
+            ok = packet_with_block(rng2, setname, good_props)
+            add(label + " (control)", enc_packet(ok), False)
+
+    for pid, name in ((0x17, "request problem information"),
+                      (0x19, "request response information")):
+        for v in range(2, 256):
+            value_case(f"{name} {v}", "connect", pid, v, rng.randint(0, 1))
+    for setname, pid, name, good in (
+            ("subscribe", 0x0B, "subscription identifier 0 on subscribe",
+             lambda: rng.randint(1, 268435455)),
+            ("publish", 0x0B, "subscription identifier 0 on publish",
+             lambda: rng.randint(1, 268435455)),
+            ("connect", 0x21, "receive maximum 0", lambda: rng.randint(1, 65535)),
+            ("connect", 0x27, "maximum packet size 0",
+             lambda: rng.randint(1, (1 << 32) - 1)),
+            ("publish", 0x23, "topic alias 0", lambda: rng.randint(1, 65535))):
+        for _ in range(30):
+            value_case(name, setname, pid, 0, good())
+    for setname in ("publish", "will"):
+        for _ in range(50):
+            value_case(f"response topic with a wildcard in {setname}",
+                       setname, 0x08, wild_topic(rng), rand_topic(rng))
+        for _ in range(10):
+            value_case(f"empty response topic in {setname}", setname, 0x08,
+                       "", rand_topic(rng))
+    for _ in range(30):
+        value_case("authentication data without a method", "connect", 0x16,
+                   rand_bytes(rng, 6), None)
+
+    for _ in range(400):
+        kind, flt, no_local = bad_filter(rng)
+        check(not filter_ok(flt, no_local), f"forbidden/filter {flt!r}",
+              "the generator made a filter the oracle's filter_ok keeps")
+        others = [(rand_filter(rng), (rng.randint(0, 2), False,
+                                      rng.random() < 0.5, rng.randint(0, 2)))
+                  for _ in range(rng.randint(0, 2))]
+        k = rng.randint(0, len(others))
+        opts = (rng.randint(0, 2), no_local, rng.random() < 0.5,
+                rng.randint(0, 2))
+        fs = others[:k] + [(flt, opts)] + others[k:]
+        pid = rng.randint(1, 65535)
+        props = rand_props(rng, "subscribe")
+        add(f"topic filter {kind} {flt!r}",
+            enc_packet(("subscribe", pid, props, fs)), True)
+        if rng.random() < 0.25:
+            good = good_plain_filter(rng)
+            if kind.startswith("share"):
+                good = "$share/" + safe_level(rng) + "/" + good
+            fs2 = others[:k] + [(good, (opts[0], False, opts[2], opts[3]))] \
+                + others[k:]
+            add(f"topic filter control {good!r}",
+                enc_packet(("subscribe", pid, props, fs2)), False)
+
+    answers = tool.run()
+    agree = 0
+    for label, idx, expected, bs in entries:
+        if answers[idx] == expected:
+            agree += 1
+        else:
+            check(False, f"forbidden/{label}",
+                  f"input {list(bs)}: got {answers[idx]}, want {expected}")
+        check(answers[idx] in ("none", want_ok(bs)), f"forbidden/{label}",
+              f"accepted, but reprinted as {answers[idx]}")
+    return len(entries), agree
+
+
 def protocol_cases():
     lines = ["parse 192,0", "parse", "parse 01", "parse 256",
              "parse 192,0,0", "bogus 1", "parse 1 2", "Parse 192,0",
@@ -1231,6 +1460,12 @@ def main():
     n_mut, a_mut = mutation_cases(rng)
     sections.append(("Mutations and named rejections, settled by the "
                      "oracle", n_mut, a_mut))
+    # Its own generator, so the sections before it keep their inputs.
+    n_fb, a_fb = forbidden_cases(random.Random(SEED + 2))
+    sections.append(("Forbidden classes drawn from the seed (property "
+                     "values, Response Topics, Authentication Data, topic "
+                     "filters of 1 to 6 levels), with controls, settled by "
+                     "the oracle", n_fb, a_fb))
     n_proto = protocol_cases()
     sections.append(("Line protocol cases", n_proto, n_proto))
 
