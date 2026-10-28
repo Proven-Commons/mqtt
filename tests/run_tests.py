@@ -312,6 +312,29 @@ def dec_props(setname, bs, i):
     return ps, end
 
 
+def filter_ok(f, no_local):
+    """The topic filter rules of sections 4.7.1, 4.7.3, 4.8.2 and
+    3.8.3.1, written from the standard's text."""
+    if f.startswith("$share/"):
+        rest = f[len("$share/"):]
+        if "/" not in rest:
+            return False      # ShareName followed by "/" [MQTT-4.8.2-2]
+        name, f = rest.split("/", 1)
+        if name == "" or "+" in name or "#" in name:
+            return False      # [MQTT-4.8.2-1] [MQTT-4.8.2-2]
+        if no_local:
+            return False      # [MQTT-3.8.3-4]
+    if f == "":
+        return False          # [MQTT-4.7.3-1]
+    levels = f.split("/")
+    for k, level in enumerate(levels):
+        if "+" in level and level != "+":
+            return False      # [MQTT-4.7.1-2]
+        if "#" in level and (level != "#" or k != len(levels) - 1):
+            return False      # [MQTT-4.7.1-1]
+    return True
+
+
 def check_topic(s):
     if s == "" or "+" in s or "#" in s:
         raise Reject()
@@ -458,6 +481,8 @@ def dec_subscribe(seg):
             raise Reject()
         o = dec_opts(seg[i])
         i += 1
+        if not filter_ok(f, o[1]):
+            raise Reject()
         filters.append((f, o))
     if not filters:
         raise Reject()
@@ -548,11 +573,23 @@ def rand_topic(rng):
 
 
 def rand_filter(rng):
+    """A random topic filter that keeps the filter rules: `+` as a
+    whole level anywhere, `#` only as the whole last level, and
+    now and then a shared subscription prefix. Broken filters are
+    forbidden packets, which the named rejection cases cover."""
+    n = rng.randint(1, 3)
     parts = []
-    for _ in range(rng.randint(1, 3)):
-        parts.append(rng.choice(["+", "#", rand_text(rng, 1, 4,
-                                                     topic_safe=True)]))
-    return "/".join(parts)
+    for k in range(n):
+        choices = ["+", rand_text(rng, 1, 4, topic_safe=True)]
+        if k == n - 1:
+            choices.append("#")
+        parts.append(rng.choice(choices))
+    f = "/".join(parts)
+    if rng.random() < 0.15:
+        name = "".join(rng.choice("abcdefgXYZ019._-")
+                       for _ in range(rng.randint(1, 4)))
+        f = "$share/" + name + "/" + f
+    return f
 
 
 def rand_bytes(rng, hi=12):
@@ -637,10 +674,14 @@ def rand_packet(rng):
                 rng.randint(1, 65535) if qos else None,
                 props, rand_bytes(rng, 20))
     if tag == "subscribe":
-        filters = [(rand_filter(rng),
-                    (rng.randint(0, 2), rng.random() < 0.5,
-                     rng.random() < 0.5, rng.randint(0, 2)))
-                   for _ in range(rng.randint(1, 3))]
+        filters = []
+        for _ in range(rng.randint(1, 3)):
+            f = rand_filter(rng)
+            # No Local is not set on a shared subscription
+            # [MQTT-3.8.3-4].
+            no_local = (not f.startswith("$share/")) and rng.random() < 0.5
+            filters.append((f, (rng.randint(0, 2), no_local,
+                                rng.random() < 0.5, rng.randint(0, 2))))
         return ("subscribe", rng.randint(1, 65535),
                 rand_props(rng, "subscribe"), filters)
     if tag == "suback":
@@ -1085,6 +1126,25 @@ def mutation_cases(rng):
                                 + enc_bin(b""))
             named.append((label if want else label + " (control)", bs,
                           want if want else want_ok(bs)))
+    # Topic filter rules (sections 4.7.1, 4.7.3, 4.8.2, 3.8.3.1).
+    for flt, opts, good in (
+            ("a/#/b", 0, False), ("a#", 0, False), ("a+", 0, False),
+            ("+a", 0, False), ("a/b+", 0, False), ("#/a", 0, False),
+            ("", 0, False), ("a/##", 0, False),
+            ("$share/g/t", 4, False), ("$share/g", 0, False),
+            ("$share//t", 0, False), ("$share/g/", 0, False),
+            ("$share/+/t", 0, False), ("$share/g#/t", 0, False),
+            ("$share/g/a/#/b", 0, False),
+            ("a/+/#", 0, True), ("#", 0, True), ("+", 0, True),
+            ("/", 0, True), ("+/+", 0, True), ("a//b", 0, True),
+            ("$share/g/t", 0, True), ("$share/g/#", 1, True),
+            ("$share/g/a/b", 0, True), ("$share", 4, True),
+            ("$sharex/a", 4, True), ("$SYS/#", 0, True)):
+        bs = raw_packet(0x82, be16(1) + b"\x00" + enc_str(flt)
+                        + bytes([opts]))
+        label = f"topic filter {flt!r} options {opts}"
+        named.append((label + (" (accepted)" if good else ""), bs,
+                      want_ok(bs) if good else "none"))
     for opts_byte, label in ((64, "options byte reserved bits set"),
                              (3, "options byte qos 3"),
                              (48, "options byte retain handling 3")):

@@ -667,7 +667,7 @@ theorem readFiltersGo_printFilters : ∀ (fuel : Nat)
     | nil => rfl
     | cons fr fs' =>
       obtain ⟨f, o⟩ := fr
-      obtain ⟨hf, ho, htail⟩ := hwf
+      obtain ⟨hf, ho, hok, htail⟩ := hwf
       have hne : ¬ (printFilter (f, o) ++ printFilters fs').isEmpty := by
         have h1 : 0 < (printFilter (f, o)).length := by
           simp only [printFilter, List.length_append, List.length_cons,
@@ -686,7 +686,7 @@ theorem readFiltersGo_printFilters : ∀ (fuel : Nat)
       simp only []
       rw [readOptsByte_printOptsByte o ho]
       simp only []
-      rw [ih fs' (by omega) htail]
+      rw [ite_eq_left hok, ih fs' (by omega) htail]
 
 /-! ## Packet bodies -/
 

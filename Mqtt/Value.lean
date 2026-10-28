@@ -538,10 +538,72 @@ def PublishWF (p : Publish) : Prop :=
 def OptsWF (o : SubOpts) : Prop :=
   o.qos ≤ 2 ∧ o.retainHandling ≤ 2
 
-/-- A topic filter list fit to print, member by member. -/
+/-! ## Topic filters -/
+
+/-- Split a text at each `/` into its topic levels (section
+    4.7.1.1). A text with no `/` is one level, and the empty
+    text is one empty level. -/
+def splitLevels : List Char → List (List Char)
+  | [] => [[]]
+  | c :: cs =>
+    if c = '/' then [] :: splitLevels cs
+    else match splitLevels cs with
+      | [] => [[c]]
+      | l :: ls => (c :: l) :: ls
+
+/-- A level of a topic filter other than the last: either `+`
+    alone, which must occupy an entire level [MQTT-4.7.1-2], or
+    a level holding neither wildcard character. -/
+def levelOK (l : List Char) : Bool :=
+  l == ['+'] || (!l.contains '#' && !l.contains '+')
+
+/-- The wildcard rules over the levels of a topic filter
+    (section 4.7.1): `+` stands alone in its level
+    [MQTT-4.7.1-2], and `#` stands alone in the last level
+    [MQTT-4.7.1-1]. -/
+def levelsOK : List (List Char) → Bool
+  | [] => true
+  | [l] => l == ['#'] || levelOK l
+  | l :: ls => levelOK l && levelsOK ls
+
+/-- A topic filter that is not a shared subscription: at least
+    one character long [MQTT-4.7.3-1], and its levels keep the
+    wildcard rules. -/
+def plainFilterOK (f : List Char) : Bool :=
+  !f.isEmpty && levelsOK (splitLevels f)
+
+/-- Split the text after `$share/` at its first `/`: the
+    ShareName before it, and the filter after it when a `/`
+    stands. -/
+def shareSplit : List Char → List Char × Option (List Char)
+  | [] => ([], none)
+  | c :: cs =>
+    if c = '/' then ([], some cs)
+    else match shareSplit cs with
+      | (n, r) => (c :: n, r)
+
+/-- A topic filter and its options, fit for a SUBSCRIBE. A filter
+    that starts with `$share/` is a shared subscription (section
+    4.8.2): a ShareName at least one character long holding no
+    `+` or `#` [MQTT-4.8.2-1], then a `/` and a topic filter
+    [MQTT-4.8.2-2], and the No Local option clear
+    [MQTT-3.8.3-4]. Any other filter keeps the plain rules. -/
+def filterOK (f : List Char) (o : SubOpts) : Bool :=
+  match f with
+  | '$' :: 's' :: 'h' :: 'a' :: 'r' :: 'e' :: '/' :: r =>
+    match shareSplit r with
+    | (name, some flt) =>
+      !name.isEmpty && !name.contains '+' && !name.contains '#'
+        && plainFilterOK flt && !o.noLocal
+    | (_, none) => false
+  | _ => plainFilterOK f
+
+/-- A topic filter list fit to print, member by member: each
+    filter is a string, its options are well formed, and the
+    pair keeps the filter rules of `filterOK`. -/
 def FiltersWF : List (List Char × SubOpts) → Prop
   | [] => True
-  | (f, o) :: fs => StrWF f ∧ OptsWF o ∧ FiltersWF fs
+  | (f, o) :: fs => StrWF f ∧ OptsWF o ∧ filterOK f o = true ∧ FiltersWF fs
 
 /-- The per type half of well formedness for a packet. -/
 def PacketFieldsWF : Packet → Prop

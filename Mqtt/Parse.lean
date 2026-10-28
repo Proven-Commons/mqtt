@@ -196,10 +196,11 @@ def readOptsByte (b : Nat) : Option SubOpts :=
   else none
 
 /-- Read topic filters until the input runs out, or `none`
-    when one fails to read. The fuel is a bound on the number
-    of filters: each filter takes at least three bytes (a two
-    byte length and an options byte), so the input length is
-    always fuel enough. -/
+    when one fails to read. Each filter, with its options, must
+    keep the filter rules of `filterOK`. The fuel is a bound on
+    the number of filters: each filter takes at least three
+    bytes (a two byte length and an options byte), so the input
+    length is always fuel enough. -/
 def readFiltersGo : Nat → List UInt8 →
     Option (List (List Char × SubOpts) × List UInt8)
   | 0, bs => if bs.isEmpty then some ([], bs) else none
@@ -211,9 +212,11 @@ def readFiltersGo : Nat → List UInt8 →
         match readOptsByte ob.toNat with
         | none => none
         | some o =>
-          match readFiltersGo fuel r2 with
-          | none => none
-          | some (fs, r3) => some ((f, o) :: fs, r3)
+          if filterOK f o then
+            match readFiltersGo fuel r2 with
+            | none => none
+            | some (fs, r3) => some ((f, o) :: fs, r3)
+          else none
       | some (_, []) => none
 
 /-! ## Body readers -/

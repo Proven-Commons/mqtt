@@ -245,9 +245,24 @@ not be 0; the SUBSCRIBE property block; then a list of topic
 filters that fills the rest of the body exactly. The list
 must be nonempty. Each filter is a filter string as a string
 field, then one subscription options byte. A filter string
-follows the string rules above; wildcards are allowed in it,
-as the standard allows. The reader adds no nonemptiness check
-of its own to a single filter string.
+follows the string rules above, and the filter rules of the
+standard (`filterOK` in `Mqtt/Value.lean`):
+
+- It is at least one character long [MQTT-4.7.3-1].
+- Split at each `/` into levels, a `+` must be a whole level
+  [MQTT-4.7.1-2], and a `#` must be a whole level and the last
+  one [MQTT-4.7.1-1]. So `a/+/#`, `#`, `+` and `/` are filters,
+  and `a/#/b`, `a#` and `a+` are not.
+- A filter that starts with `$share/` is a shared subscription
+  (section 4.8.2): after `$share/` comes a ShareName at least
+  one character long with no `+` or `#` [MQTT-4.8.2-1], then a
+  `/` and a filter that keeps the two rules above
+  [MQTT-4.8.2-2]. Its No Local option must be clear
+  [MQTT-3.8.3-4]. A filter that starts `$share` with no `/`
+  after it is an ordinary filter.
+
+A filter that breaks a rule is rejected, and so is the whole
+packet.
 
 The subscription options byte is: the maximum QoS at bits 0
 and 1, the no local flag at bit 2, the retain as published
@@ -332,7 +347,8 @@ fields the printer can write exactly. In outline:
   properties; a packet identifier standing exactly when the
   QoS is 1 or 2, and never 0.
 - SUBSCRIBE: a nonzero packet identifier, a nonempty filter
-  list, and options with QoS and retain handling at most 2.
+  list, options with QoS and retain handling at most 2, and
+  each filter keeping the filter rules above.
 - SUBACK: a nonzero packet identifier and a nonempty reason
   list of byte values.
 - DISCONNECT with a body: a reason code below 256 and a well
@@ -409,6 +425,7 @@ inputs.
 | A CONNECT with the will flag clear and the will QoS or will retain bit set is refused (example inputs: connect flags 0x0A and 0x22) | `Spec.rejects_will_bits_without_will` |
 | A property on a packet type that does not allow it is refused | `Spec.rejects_property_wrong_type` |
 | A single use property standing twice in one block is refused | `Spec.rejects_repeated_property` |
+| SUBSCRIBE topic filters that break the filter rules are refused, one example input each: `a/#/b`, `a+`, the empty filter, `$share/g/t` with No Local, and `$share/g`; `a/+/#` and `$share/g/t` without No Local are accepted | `Spec.rejects_bad_topic_filters` |
 | A SUBSCRIBE with packet identifier 0 is refused | `Spec.rejects_subscribe_id_zero` |
 | Property values the standard calls a Protocol Error are refused, one example input each: a Subscription Identifier, Topic Alias, Receive Maximum or Maximum Packet Size of 0, a Request Problem Information or Request Response Information of 2, Authentication Data without an Authentication Method, and a Response Topic that holds a wildcard or is empty | `Spec.rejects_property_value_rules` |
 | A PINGREQ with a body is refused | `Spec.rejects_pingreq_body` |

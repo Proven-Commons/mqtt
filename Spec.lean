@@ -177,6 +177,37 @@ theorem Spec.rejects_repeated_property :
     (parse ([50, 12, 0, 1, 97, 0, 3, 6, 35, 0, 1, 35, 0, 2]
       : List UInt8)).isSome = false := sorry
 
+/-- SUBSCRIBE topic filters that break the filter rules are
+    refused, one example input each (sections 4.7.1, 4.7.3,
+    4.8.2 and 3.8.3.1): `#` before the last level, `+` sharing
+    its level, an empty filter, a shared subscription with No
+    Local set, and `$share/` with no filter after the ShareName.
+    Two filters that keep the rules are accepted: `a/+/#`, and
+    `$share/g/t` with No Local clear. -/
+theorem Spec.rejects_bad_topic_filters :
+    -- `a/#/b`: `#` not in the last level
+    (parse ([130, 11, 0, 1, 0, 0, 5, 97, 47, 35, 47, 98, 0]
+      : List UInt8)).isSome = false
+    -- `a+`: `+` not alone in its level
+    ∧ (parse ([130, 8, 0, 1, 0, 0, 2, 97, 43, 0] : List UInt8)).isSome = false
+    -- the empty filter
+    ∧ (parse ([130, 6, 0, 1, 0, 0, 0, 0] : List UInt8)).isSome = false
+    -- `$share/g/t` with No Local set
+    ∧ (parse ([130, 16, 0, 1, 0, 0, 10, 36, 115, 104, 97, 114, 101, 47, 103,
+        47, 116, 4] : List UInt8)).isSome = false
+    -- `$share/g`: no `/` and filter after the ShareName
+    ∧ (parse ([130, 14, 0, 1, 0, 0, 8, 36, 115, 104, 97, 114, 101, 47, 103, 0]
+        : List UInt8)).isSome = false
+    -- `a/+/#` is accepted
+    ∧ parse ([130, 11, 0, 1, 0, 0, 5, 97, 47, 43, 47, 35, 0] : List UInt8)
+      = some (.subscribe 1 [] [(['a', '/', '+', '/', '#'], ⟨0, false, false, 0⟩)])
+    -- `$share/g/t` with No Local clear is accepted
+    ∧ parse ([130, 16, 0, 1, 0, 0, 10, 36, 115, 104, 97, 114, 101, 47, 103, 47,
+        116, 0] : List UInt8)
+      = some (.subscribe 1 []
+          [(['$', 's', 'h', 'a', 'r', 'e', '/', 'g', '/', 't'],
+            ⟨0, false, false, 0⟩)]) := sorry
+
 /-- A SUBSCRIBE with packet identifier 0 is refused:
     identifiers are never 0. -/
 theorem Spec.rejects_subscribe_id_zero :
