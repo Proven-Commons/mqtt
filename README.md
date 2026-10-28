@@ -242,11 +242,22 @@ are about.
   writing the value again, and topic filters by splitting
   at `/`). Both are evidence, not proof. The results file
   names the versions used, and states plainly which
-  oracles were and were not available. Paho's decoder
-  accepts variable byte integers longer than the value
-  needs, which section 1.5.5 forbids; the run records that
-  as a named difference and does not take Paho's answer
-  there.
+  oracles were and were not available. In the Paho
+  cross-check, Paho judges answers of the Lean tool: its
+  encoder's writings of variable byte integers, and
+  property blocks of all six kinds, accepted and refused,
+  judged by `Properties.unpack`. It does not judge whole
+  packets. Paho departs from the standard in places, and
+  the run checks those apart as named differences rather
+  than take Paho's answer there: its decoder accepts
+  variable byte integers longer than the value needs
+  (section 1.5.5 forbids them), it refuses a Payload
+  Format Indicator above 1 and a Maximum Packet Size above
+  268435455 (the standard does not), and it accepts a
+  Response Topic with a wildcard or empty, Authentication
+  Data without a Method, and a repeated Subscription
+  Identifier on SUBSCRIBE (the standard calls each a
+  Protocol Error).
 - The line handling in `Main.lean` (splitting a request
   line, reading decimal codes). The tests drive it, and no
   proof covers it.

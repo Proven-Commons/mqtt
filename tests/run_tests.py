@@ -15,14 +15,16 @@ Layers, all settled against independent expectations:
    bytes reprinted.
 
 3. A cross-check against Paho's Python library when it is
-   importable: variable byte integers written by its encoder
-   are fed to the Lean tool as Subscription Identifiers, and
-   property blocks it packs for PUBLISH are read by the
-   oracle, wrapped in packets, and fed to the Lean tool. Its
-   decoder accepts writings longer than the value needs, which
-   MQTT-1.5.5-1 forbids; the run records that as a named
-   difference. When the library is absent, the run says so and
-   the oracle carries accept and reject alone. The Mosquitto
+   importable, in which Paho judges each Lean answer: variable
+   byte integers written by its encoder are fed to the Lean
+   tool as Subscription Identifiers and must come back
+   unchanged, and property blocks of all six kinds, accepted
+   and refused, are judged by Paho's Properties.unpack and by
+   the Lean tool, whose verdicts must agree. The classes where
+   Paho departs from the standard are checked apart for their
+   documented direction, as named differences. When the
+   library is absent, the run says so and the oracle carries
+   accept and reject alone. The Mosquitto
    test suite is a separate program, not a Python library; the
    run checks for its binary and the results file states
    whether it was present.
@@ -856,21 +858,118 @@ def oracle_differential(rng, count):
     return len(entries), agree
 
 
-def paho_section(rng, count_props):
-    """Cross-checks against Paho: variable byte integers, and
-    PUBLISH property blocks packed by the library. Returns
-    (inputs, agreements)."""
+PAHO_PACKET = {"connect": "CONNECT", "will": "WILLMESSAGE",
+               "publish": "PUBLISH", "subscribe": "SUBSCRIBE",
+               "suback": "SUBACK", "disconnect": "DISCONNECT"}
+
+UNKNOWN_IDS = [0x00, 0x04, 0x07, 0x0A, 0x2B, 0x30, 0x7F]
+
+
+def block_packet(setname, block):
+    """A valid packet around the raw property block `block` (its
+    length included), standing as the block of kind `setname`."""
+    if setname == "connect":
+        return raw_packet(0x10, enc_str("MQTT") + bytes([5, 2]) + be16(0)
+                          + block + enc_str("c"))
+    if setname == "will":
+        return raw_packet(0x10, enc_str("MQTT") + bytes([5, 6]) + be16(0)
+                          + b"\x00" + enc_str("c") + block + enc_str("w")
+                          + enc_bin(b""))
+    if setname == "publish":
+        return raw_packet(0x30, enc_str("a") + block + b"x")
+    if setname == "subscribe":
+        return raw_packet(0x82, be16(1) + block + enc_str("a") + b"\x00")
+    if setname == "suback":
+        return raw_packet(0x90, be16(1) + block + b"\x00")
+    if setname == "disconnect":
+        return raw_packet(0xE0, b"\x00" + block)
+    raise ValueError(setname)
+
+
+def raw_block(entries):
+    """A property block from (identifier, value) pairs, any
+    identifier, written as given: an unknown identifier gets one
+    value byte."""
+    body = b""
+    for pid, v in entries:
+        if pid in PROP_TYPE:
+            body += enc_vbi(pid) + enc_prop_val(PROP_TYPE[pid], v)
+        else:
+            body += enc_vbi(pid) + bytes([v])
+    return enc_vbi(len(body)) + body
+
+
+def judge_entries(rng, setname):
+    """Random properties for a block of kind `setname`, for Paho
+    to judge: mostly allowed ones, some known identifiers that the
+    block does not allow, some unknown identifiers, values drawn
+    across their whole width (so forbidden values such as 0 come
+    up), and now and then a repeat. The five classes where Paho
+    departs from the standard are left out here and checked on
+    their own: a Payload Format Indicator above 1, a Response
+    Topic that is empty or holds a wildcard, Authentication Data
+    without a Method, a repeated Subscription Identifier on
+    SUBSCRIBE, and a Maximum Packet Size above 268435455."""
+    out = []
+    for _ in range(rng.randint(0, 4)):
+        r = rng.random()
+        if r < 0.65:
+            pid = rng.choice(ALLOWED[setname])
+        elif r < 0.92:
+            pid = rng.choice(sorted(PROP_TYPE))
+        else:
+            out.append((rng.choice(UNKNOWN_IDS), rng.randrange(256)))
+            continue
+        if pid == 0x01:
+            v = rng.randint(0, 1)
+        elif pid == 0x27:
+            v = rng.choice([0, 1, 65536, rng.randrange(1, 1 << 28)])
+        elif pid == 0x08:
+            v = rand_topic(rng)
+        else:
+            v = rand_typed_value(rng, PROP_TYPE[pid])
+        out.append((pid, v))
+        if rng.random() < 0.15:
+            out.append((pid, v if pid in (0x01, 0x08, 0x27)
+                        else rand_typed_value(rng, PROP_TYPE[pid])))
+    ids = [i for i, _ in out]
+    if 0x16 in ids and 0x15 not in ids:
+        out.append((0x15, rand_text(rng, 1, 4, topic_safe=True)))
+    if setname == "subscribe" and ids.count(0x0B) > 1:
+        first = ids.index(0x0B)
+        out = [e for k, e in enumerate(out) if e[0] != 0x0B or k == first]
+    rng.shuffle(out)
+    return out
+
+
+def paho_section(rng, count_blocks):
+    """Cross-checks in which Paho judges an answer of the Lean
+    tool. Returns (comparisons, agreements, accepted, refused).
+
+    1. Paho's encoder writes variable byte integers; each, as the
+       Subscription Identifier of a SUBSCRIBE, must be accepted
+       by the Lean tool and reprinted as the same bytes.
+    2. Paho's Properties.unpack judges property blocks of all six
+       kinds that the Lean tool accepts and refuses: the tool's
+       verdict on the block inside a valid packet must equal
+       Paho's verdict on the block alone.
+    The classes where Paho departs from the standard are checked
+    apart: each must show the documented difference, and they are
+    not counted as comparisons."""
     from paho.mqtt.properties import Properties, VariableByteIntegers
     from paho.mqtt.packettypes import PacketTypes
     tool = Tool()
     entries = []
-    total = 0
-    agree = 0
 
-    # Paho's writing of each value, as the Subscription Identifier
-    # of a SUBSCRIBE: the Lean tool must accept the packet and
-    # print the same bytes back. Value 0 is left out: it is not a
-    # valid Subscription Identifier.
+    def paho_accepts(setname, block):
+        props = Properties(getattr(PacketTypes, PAHO_PACKET[setname]))
+        try:
+            _, used = props.unpack(block)
+        except Exception:
+            return False
+        return used == len(block)
+
+    # 1. Paho's writing of each value as a Subscription Identifier.
     values = [v for v, _ in VBI_TABLE if v != 0]
     values += [rng.randrange(1, 1 << 28) for _ in range(120)]
     for v in values:
@@ -878,73 +977,94 @@ def paho_section(rng, count_props):
         block = bytes([11]) + enc
         body = be16(1) + enc_vbi(len(block)) + block + enc_str("a") + b"\x00"
         bs = raw_packet(0x82, body)
-        idx = tool.ask(req(bs))
-        entries.append((idx, want_ok(bs)))
-        total += 1
-    # Paho's decoder on the longer writing 128, 0 of the value 0.
-    # The standard forbids that writing [MQTT-1.5.5-1]; the Lean
-    # tool must refuse it as a remaining length, and Paho's
-    # answer is recorded, not taken.
+        entries.append(("paho vbi", tool.ask(req(bs)), want_ok(bs), bs))
+
+    # 2. Paho judges property blocks.
+    kinds = sorted(PAHO_PACKET)
+    for _ in range(count_blocks):
+        setname = rng.choice(kinds)
+        block = raw_block(judge_entries(rng, setname))
+        bs = block_packet(setname, block)
+        verdict = paho_accepts(setname, block)
+        entries.append((f"paho judges a {setname} block {list(block)}",
+                        tool.ask(req(bs)),
+                        want_ok(bs) if verdict else "none", bs))
+
+    # The documented differences, each checked for its direction.
+    diffs = [
+        ("Payload Format Indicator 2 on PUBLISH", "publish",
+         [(0x01, 2)], False, True,
+         "section 3.3.2.3.2 names 0 and 1 but does not call another "
+         "value a Protocol Error, so this reader accepts it; Paho "
+         "refuses it"),
+        ("Payload Format Indicator 255 in the will", "will",
+         [(0x01, 255)], False, True, None),
+        ("Response Topic with a wildcard on PUBLISH", "publish",
+         [(0x08, "a/#")], True, False,
+         "MQTT-3.3.2-14 forbids wildcards in a Response Topic and "
+         "4.7.3-1 an empty one, so this reader refuses them; Paho "
+         "accepts them"),
+        ("empty Response Topic in the will", "will", [(0x08, "")],
+         True, False, None),
+        ("Authentication Data without a Method on CONNECT", "connect",
+         [(0x16, b"x")], True, False,
+         "section 3.1.2.11.10 makes Authentication Data without an "
+         "Authentication Method a Protocol Error, so this reader "
+         "refuses it; Paho accepts it"),
+        ("Maximum Packet Size 4294967295 on CONNECT", "connect",
+         [(0x27, 4294967295)], False, True,
+         "section 3.1.2.11.4 makes the Maximum Packet Size a Four Byte "
+         "Integer and calls only 0 (or a repeat) a Protocol Error, so "
+         "this reader accepts values up to 2^32 - 1; Paho refuses those "
+         "above 268435455"),
+        ("Maximum Packet Size 268435456 on CONNECT", "connect",
+         [(0x27, 268435456)], False, True, None),
+        ("two Subscription Identifiers on SUBSCRIBE", "subscribe",
+         [(0x0B, 1), (0x0B, 2)], True, False,
+         "section 3.8.2.1.2 makes a second Subscription Identifier on "
+         "SUBSCRIBE a Protocol Error, so this reader refuses it; Paho "
+         "allows the repeat on any packet"),
+    ]
+    diff_entries = []
+    for label, setname, props, paho_ok, lean_ok, why in diffs:
+        block = raw_block(props)
+        bs = block_packet(setname, block)
+        diff_entries.append((label, tool.ask(req(bs)), paho_ok, lean_ok, bs,
+                             setname, block, why))
+
+    answers = tool.run()
+    agree = accepted = refused = 0
+    for label, idx, expected, bs in entries:
+        if answers[idx] == expected:
+            agree += 1
+        else:
+            check(False, label, f"Lean {answers[idx]}, Paho's verdict {expected}")
+        if answers[idx] == "none":
+            refused += 1
+        else:
+            accepted += 1
+            check(answers[idx] == want_ok(bs), label,
+                  f"accepted, but reprinted as {answers[idx]}")
+    for label, idx, paho_ok, lean_ok, bs, setname, block, why in diff_entries:
+        got_paho = paho_accepts(setname, block)
+        got_lean = answers[idx] != "none"
+        check(got_paho == paho_ok and got_lean == lean_ok,
+              f"paho difference/{label}",
+              f"Paho {'accepts' if got_paho else 'refuses'}, Lean "
+              f"{'accepts' if got_lean else 'refuses'}; documented: Paho "
+              f"{'accepts' if paho_ok else 'refuses'}, Lean "
+              f"{'accepts' if lean_ok else 'refuses'}")
+        if why:
+            paho_named.append(f"{label}, and the like: {why}. Checked on "
+                              "single blocks, not counted as comparisons.")
     paho_named.append(
         "paho-mqtt's VariableByteIntegers.decode reads the longer "
         "writing 128, 0 as "
         f"{VariableByteIntegers.decode(bytes([128, 0]))!r} (value, "
         "bytes read); this reader refuses that writing, as "
-        "MQTT-1.5.5-1 requires, so the run does not take Paho's "
-        "answer there.")
-    idx = tool.ask(req(bytes([192, 128, 0])))
-    entries.append((idx, "none"))
-    total += 1
-
-    attr = {0x01: "PayloadFormatIndicator", 0x02: "MessageExpiryInterval",
-            0x03: "ContentType", 0x08: "ResponseTopic",
-            0x09: "CorrelationData", 0x0B: "SubscriptionIdentifier",
-            0x23: "TopicAlias", 0x26: "UserProperty"}
-    for _ in range(count_props):
-        props = Properties(PacketTypes.PUBLISH)
-        chosen = []
-        if rng.random() < 0.7:
-            props.PayloadFormatIndicator = rng.randint(0, 1)
-        if rng.random() < 0.5:
-            props.MessageExpiryInterval = rng.randrange(1 << 32)
-        if rng.random() < 0.5:
-            props.ContentType = rand_text(rng, 1, 6, topic_safe=True)
-        if rng.random() < 0.4:
-            props.ResponseTopic = rand_topic(rng)
-        if rng.random() < 0.4:
-            props.CorrelationData = rand_bytes(rng, 6)
-        if rng.random() < 0.5:
-            props.SubscriptionIdentifier = [rng.randint(1, 1000)
-                                            for _ in range(rng.randint(1, 2))]
-        if rng.random() < 0.5:
-            props.TopicAlias = rng.randint(1, 65535)
-        if rng.random() < 0.5:
-            props.UserProperty = [(rand_text(rng, 1, 4, topic_safe=True),
-                                   rand_text(rng, 0, 4, topic_safe=True))]
-        packed = bytes(props.pack())
-        try:
-            parsed, j = dec_props("publish", packed, 0)
-            okshape = j == len(packed)
-        except Reject:
-            okshape = False
-        if not okshape or enc_props(parsed) != packed:
-            check(False, "paho properties",
-                  f"oracle cannot read paho block {list(packed)}")
-            continue
-        pkt = ("publish", False, 1, False, "paho/topic", 7, parsed,
-               b"\x10\x20")
-        bs = enc_packet(pkt)
-        idx = tool.ask(req(bs))
-        entries.append((idx, want_ok(bs)))
-        total += 1
-    answers = tool.run()
-    for idx, expected in entries:
-        if answers[idx] == expected:
-            agree += 1
-        else:
-            check(False, "paho packet",
-                  f"got {answers[idx]}, want {expected}")
-    return total, agree
+        "MQTT-1.5.5-1 requires (the fixed cases check it), so the "
+        "property blocks Paho judges hold only shortest writings.")
+    return len(entries), agree, accepted, refused
 
 
 def mutation_cases(rng):
@@ -1450,11 +1570,13 @@ def main():
     # The Paho section draws from its own generator, so whether it
     # runs does not change the inputs of the sections after it.
     if paho_present:
-        n_pa, a_pa = paho_section(random.Random(SEED + 1), 250)
-        extra.append((f"Paho {paho_version} cross-check (variable byte "
-                      "integers as Subscription Identifiers, and "
-                      "PUBLISH property blocks; not counted in Inputs)",
-                      n_pa, a_pa))
+        n_pa, a_pa, acc_pa, ref_pa = paho_section(random.Random(SEED + 1), 600)
+        extra.append((f"Paho {paho_version} cross-check, each a Lean answer "
+                      "judged by Paho: its variable byte integer writings "
+                      "as Subscription Identifiers, and property blocks of "
+                      "all six kinds judged by Properties.unpack (Lean "
+                      f"accepted {acc_pa}, refused {ref_pa}; not counted in "
+                      "Inputs)", n_pa, a_pa))
     named = paho_named
 
     n_mut, a_mut = mutation_cases(rng)
@@ -1499,10 +1621,14 @@ def main():
         lines.append(f"Paho's Python library (`paho-mqtt`, version "
                      f"{paho_version}) was importable in the interpreter "
                      "that ran this harness; the Paho cross-check ran. "
-                     "It covers variable byte integers and PUBLISH "
-                     "property blocks, the pieces the library exposes "
-                     "without a broker. Its inputs are listed below and "
-                     "are not part of Inputs.")
+                     "Each of its inputs compares an answer of the Lean "
+                     "tool with Paho's: Paho's encoder output for "
+                     "variable byte integers must come back unchanged, "
+                     "and Paho's Properties.unpack judges property "
+                     "blocks of all six kinds, accepted and refused, the "
+                     "pieces the library exposes without a broker. It "
+                     "does not judge whole packets. Its inputs are "
+                     "listed below and are not part of Inputs.")
     else:
         lines.append("Paho's Python library (`paho-mqtt`) was NOT "
                      "importable in the interpreter that ran this "
