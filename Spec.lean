@@ -114,14 +114,14 @@ theorem Spec.parsePacket_four_byte_cap (h b0 b1 b2 b3 : UInt8)
     parsePacket (h :: b0 :: b1 :: b2 :: b3 :: rest) = none
       ∧ parse (h :: b0 :: b1 :: b2 :: b3 :: rest) = none := sorry
 
-/-! ## Refused inputs
+/-! ## Example inputs
 
-Single inputs the reader refuses, one for each headline rule of
-`SPEC.md`. Each input is one of the named rejection cases in the
-test harness. Each statement is about its one input only: the
-differential tests cover these rules on many more inputs, and
-these statements pin them so a reader of the specification can
-check each rule against one concrete case. -/
+Single inputs the reader refuses or accepts, for the headline
+rules of `SPEC.md`; the test harness has a named case for each
+rule. Each statement is about its own inputs only, so a reader
+of the specification can check each rule against a concrete
+case. That the rule holds for every input follows from
+`Spec.parse_sound` and the well formedness rules it names. -/
 
 /-- A SUBSCRIBE packet with flags 0000 is refused: the value the
     standard fixes for SUBSCRIBE is 0010. -/

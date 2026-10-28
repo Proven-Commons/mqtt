@@ -411,18 +411,17 @@ oracle.
 ## Properties and their theorems
 
 Each property a reader can check in the page (`README.md`)
-names its theorem. A row marked "one example input" is a
-theorem about that input alone. The rule it illustrates holds
-for every input through `Spec.parse_sound`: an accepted input
-is the printing of a well formed packet, and no well formed
-packet prints in the refused way, as the sections above
-describe. The theorems are stated in `Spec.lean`
-and proved in `Proofs/SpecProofs.lean`. The variable byte
-integer and frame theorems, and the four byte cap theorems,
-hold for every input. The other refusal theorems are
-single inputs, one for each named rejection case in the test
-harness; the tests in `tests/` cover each rule on many more
-inputs.
+names its theorem. The theorems are stated in `Spec.lean` and
+proved in `Proofs/SpecProofs.lean`. The round trip, soundness,
+variable byte integer, frame and four byte cap theorems hold
+for every input. A row marked "one example input", or one that
+names its inputs, is a theorem about those inputs alone; the
+test harness has a named case for each such rule. The rule it
+illustrates holds for every input through `Spec.parse_sound`:
+an accepted input is the printing of a well formed packet, and
+no well formed packet prints in the refused way, as the
+sections above describe. The tests in `tests/` also check each
+rule on many more inputs.
 
 | Property | Theorem |
 |----------|---------|
