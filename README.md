@@ -185,10 +185,9 @@ are about.
   whose text an approval does not pin. They are: the string
   rules (strict UTF-8, no U+0000, at most 65535 bytes) and
   the binary length limit; the subscription options byte
-  (bits 6 and 7 clear, QoS and Retain Handling not 3); the
-  will QoS of 2 at most as a field; a SUBACK with a packet
-  identifier other than 0 and at least one reason code;
-  and the three DISCONNECT body forms. The tests in
+  (bits 6 and 7 clear, QoS and Retain Handling not 3); a
+  SUBACK with a packet identifier other than 0 and at least
+  one reason code; and the three DISCONNECT body forms. The tests in
   `tests/` check them, and the example theorems in
   `Proofs/Examples.lean` check some on single inputs.
 - Any reading of what a property means. A property is an

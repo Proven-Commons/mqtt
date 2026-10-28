@@ -371,8 +371,8 @@ specification, and proved for every input from there:
 These are stated for the stream reader; `Spec.parse_whole`
 carries them to the whole input reader. The rules of well
 formedness with no such statement are the string rules, the
-binary length limit, the subscription options byte, the will
-QoS field, the SUBACK fields, and the DISCONNECT body forms.
+binary length limit, the subscription options byte, the
+SUBACK fields, and the DISCONNECT body forms.
 The reader keeps them, but their text is only in the code;
 the page lists them under What is not proved.
 
