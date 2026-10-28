@@ -349,7 +349,10 @@ structure Publish where
   deriving DecidableEq, Repr
 
 /-- A control packet of one of the seven types this slice
-    covers. -/
+    covers. A DISCONNECT body is one of the three forms section
+    3.14 allows: none at all (`none`), a reason code alone
+    (`some (rc, none)`), or a reason code and a property block
+    (`some (rc, some ps)`). -/
 inductive Packet where
   | connect (c : Connect) : Packet
   | publish (p : Publish) : Packet
@@ -359,7 +362,7 @@ inductive Packet where
       (reasons : List Nat) : Packet
   | pingreq : Packet
   | pingresp : Packet
-  | disconnect (body : Option (Nat × List Property)) : Packet
+  | disconnect (body : Option (Nat × Option (List Property))) : Packet
   deriving DecidableEq, Repr
 
 /-! ## Body printers -/
@@ -451,7 +454,8 @@ def bodyOf : Packet → List UInt8
   | .pingreq => []
   | .pingresp => []
   | .disconnect none => []
-  | .disconnect (some (rc, ps)) => [rc.toUInt8] ++ printProps ps
+  | .disconnect (some (rc, none)) => [rc.toUInt8]
+  | .disconnect (some (rc, some ps)) => [rc.toUInt8] ++ printProps ps
 
 /-- The fixed header byte of a packet: the type in the high
     nibble, and the flags the specification fixes in the low
@@ -617,7 +621,8 @@ def PacketFieldsWF : Packet → Prop
   | .pingreq => True
   | .pingresp => True
   | .disconnect none => True
-  | .disconnect (some (rc, ps)) => rc < 256 ∧ PropsBlockWF .disconnect ps
+  | .disconnect (some (rc, none)) => rc < 256
+  | .disconnect (some (rc, some ps)) => rc < 256 ∧ PropsBlockWF .disconnect ps
 
 /-- A packet fit to print: its fields are well formed and its
     body fits the remaining length, a variable byte integer of

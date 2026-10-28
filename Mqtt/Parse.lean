@@ -350,18 +350,20 @@ def readSubackBody (seg : List UInt8) : Option Packet := do
 
 /-- Read a DISCONNECT body: an empty cut is a normal
     disconnection with no body. A cut of one byte is a reason
-    code on its own: the specification omits the property
-    length when the remaining length is 1 (section 3.14.2).
-    A longer cut is a reason code and a property block that
-    fills the rest of the cut. -/
+    code on its own, with no property block: the specification
+    omits the property length when the remaining length is 1
+    (section 3.14.2.2.1). A longer cut is a reason code and a
+    property block that fills the rest of the cut. The value
+    keeps which form arrived, so the printer writes it back the
+    same way. -/
 def readDisconnectBody (seg : List UInt8) : Option Packet :=
   match seg with
   | [] => some (.disconnect none)
   | rc :: r1 =>
-    if r1.isEmpty then some (.disconnect (some (rc.toNat, [])))
+    if r1.isEmpty then some (.disconnect (some (rc.toNat, none)))
     else do
       let (props, r2) ← readProps .disconnect r1
-      if r2.isEmpty then pure (.disconnect (some (rc.toNat, props))) else none
+      if r2.isEmpty then pure (.disconnect (some (rc.toNat, some props))) else none
 
 /-- Read a packet body of the given type, with the given fixed
     header flags, from a body cut out by the remaining length.

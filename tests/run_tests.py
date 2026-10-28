@@ -6,16 +6,13 @@ Layers, all settled against independent expectations:
 1. Fixed cases: the variable byte integer table from section
    2.1.4 of the standard, hand built packets for each of the
    seven packet types in this slice, and the DISCONNECT one
-   byte body form, which is legal and reprints in the longer
-   canonical form.
+   byte body form, which is legal and reprints as it came.
 
 2. A differential against a strict oracle written here from
-   the standard and from SPEC.md (including the pinned
-   reading that the DISCONNECT body of length 1 is a reason
-   code with an empty property block): random packets of all
-   seven types with varied properties are encoded by the
-   oracle, read by the Lean tool, and the answer must be the
-   canonical reprint.
+   the standard and from SPEC.md: random packets of all seven
+   types with varied properties are encoded by the oracle,
+   read by the Lean tool, and the answer must be the same
+   bytes reprinted.
 
 3. A cross-check against Paho's Python library when it is
    importable: variable byte integers written by its encoder
@@ -113,7 +110,8 @@ def want_ok(canon):
 #                                  retain_handling))
 #   ("suback", packet_id, props, [reason, ...])
 #   ("pingreq",)  ("pingresp",)
-#   ("disconnect", None) or ("disconnect", (reason, props))
+#   ("disconnect", None), ("disconnect", (reason, None)) for the
+#     one byte body, or ("disconnect", (reason, props))
 # A property is (id, value): an int for byte, two byte, four byte,
 # and variable byte integer values; a str for a UTF-8 string value;
 # a (str, str) pair for a user property; bytes for binary data.
@@ -400,6 +398,8 @@ def enc_packet(pkt):
         header = 0xE0
         if pkt[1] is None:
             body = b""
+        elif pkt[1][1] is None:
+            body = bytes([pkt[1][0]])
         else:
             body = bytes([pkt[1][0]]) + enc_props(pkt[1][1])
     else:
@@ -504,7 +504,9 @@ def dec_disconnect(seg):
     if len(seg) == 0:
         return ("disconnect", None)
     if len(seg) == 1:
-        return ("disconnect", (seg[0], []))
+        # No property length when the remaining length is below 2
+        # (3.14.2.2.1).
+        return ("disconnect", (seg[0], None))
     props, j = dec_props("disconnect", seg, 1)
     if j != len(seg):
         raise Reject()
@@ -696,9 +698,10 @@ def rand_packet(rng):
         return ("pingresp",)
     if rng.random() < 0.3:
         return ("disconnect", None)
-    return ("disconnect",
-            (rng.choice([0, 4, 129, 135, 142, rng.randrange(256)]),
-             rand_props(rng, "disconnect")))
+    reason = rng.choice([0, 4, 129, 135, 142, rng.randrange(256)])
+    if rng.random() < 0.3:
+        return ("disconnect", (reason, None))
+    return ("disconnect", (reason, rand_props(rng, "disconnect")))
 
 
 # ---------------------------------------------------------------------------
@@ -771,8 +774,10 @@ def fixed_cases():
     add("pingreq", bytes([192, 0]))
     add("pingresp", bytes([208, 0]))
     add("disconnect empty", bytes([224, 0]))
-    add("disconnect reason only, canonical reprint",
-        bytes([224, 1, 0]), want_ok(bytes([224, 2, 0, 0])))
+    add("disconnect reason only, reprinted as it came",
+        bytes([224, 1, 0]))
+    add("disconnect reason 142 only", bytes([224, 1, 142]))
+    add("disconnect reason and empty properties", bytes([224, 2, 0, 0]))
     add("publish qos0", bytes([48, 6, 0, 1, 97, 0, 1, 2]))
     add("publish qos1", bytes([50, 6, 0, 1, 97, 0, 1, 0]))
     add("subscribe one filter", bytes([130, 7, 0, 1, 0, 0, 1, 97, 0]))
@@ -936,11 +941,11 @@ def mutation_cases(rng):
 
     def settle(label, bs):
         idx = tool.ask(req(bs))
-        entries.append((label, idx, settled_answer(bs)))
+        entries.append((label, idx, settled_answer(bs), bs))
 
     def expect(label, bs, expected):
         idx = tool.ask(req(bs))
-        entries.append((label, idx, expected))
+        entries.append((label, idx, expected, bs))
         check(settled_answer(bs) == expected, f"mutation/{label}",
               "oracle disagrees with the named expectation")
 
@@ -1069,7 +1074,7 @@ def mutation_cases(rng):
     named.append(("empty reason list in suback",
                   raw_packet(0x90, be16(1) + b"\x00"), "none"))
     named.append(("disconnect body of length 1, accepted",
-                  bytes([224, 1, 0]), want_ok(bytes([224, 2, 0, 0]))))
+                  bytes([224, 1, 0]), want_ok(bytes([224, 1, 0]))))
     named.append(("pingreq with a body", bytes([192, 1, 0]), "none"))
     named.append(("packet type 2, outside this slice",
                   bytes([32, 0]), "none"))
@@ -1155,12 +1160,15 @@ def mutation_cases(rng):
         expect(label, bs, expected)
     answers = tool.run()
     agree = 0
-    for label, idx, expected in entries:
+    for label, idx, expected, bs in entries:
         if answers[idx] == expected:
             agree += 1
         else:
             check(False, f"mutation/{label}",
                   f"got {answers[idx]}, want {expected}")
+        # Every input the tool accepts reprints byte for byte.
+        check(answers[idx] in ("none", want_ok(bs)), f"mutation/{label}",
+              f"accepted, but reprinted as {answers[idx]}")
     return len(entries), agree
 
 

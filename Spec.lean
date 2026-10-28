@@ -247,6 +247,19 @@ theorem Spec.rejects_property_value_rules :
     -- an empty Response Topic, on a PUBLISH
     ∧ (parse ([48, 7, 0, 1, 97, 3, 8, 0, 0] : List UInt8)).isSome = false := sorry
 
+/-- The two DISCONNECT forms with a reason code are kept apart
+    (section 3.14.2.2.1: with a remaining length below 2 there is
+    no property length): the one byte body `[0]` reads as the
+    reason code alone and prints back as the same three bytes,
+    and the body `[0, 0]` reads as the reason code with an empty
+    property block and prints back as the same four bytes. -/
+theorem Spec.disconnect_short_form :
+    parse ([224, 1, 0] : List UInt8) = some (.disconnect (some (0, none)))
+    ∧ print (.disconnect (some (0, none))) = [224, 1, 0]
+    ∧ parse ([224, 2, 0, 0] : List UInt8)
+      = some (.disconnect (some (0, some [])))
+    ∧ print (.disconnect (some (0, some []))) = [224, 2, 0, 0] := sorry
+
 /-- A PINGREQ with a body is refused: its remaining length must
     be 0. -/
 theorem Spec.rejects_pingreq_body :

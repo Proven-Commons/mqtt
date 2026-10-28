@@ -64,10 +64,15 @@ theorem parse_pingresp : parse [208, 0] = some .pingresp := by decide
 theorem parse_disconnect_empty :
     parse [224, 0] = some (.disconnect none) := by decide
 
-/-- A DISCONNECT body of one byte is a reason code with an
-    empty property block. It is legal. -/
+/-- A DISCONNECT body of one byte is a reason code with no
+    property block. It is legal, and the value keeps the form. -/
 theorem parse_disconnect_reason :
-    parse [224, 1, 0] = some (.disconnect (some (0, []))) := by decide
+    parse [224, 1, 0] = some (.disconnect (some (0, none))) := by decide
+
+/-- A DISCONNECT body of a reason code and an empty property
+    block is the other form. -/
+theorem parse_disconnect_reason_props :
+    parse [224, 2, 0, 0] = some (.disconnect (some (0, some []))) := by decide
 
 theorem parse_publish_qos0 :
     parse [48, 6, 0, 1, 97, 0, 1, 2]

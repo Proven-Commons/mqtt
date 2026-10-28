@@ -291,20 +291,20 @@ Three body forms are legal:
 - A remaining length of 0: a normal disconnection with no
   body.
 - A remaining length of 1: one reason code byte and no
-  property block. The standard omits the property length when
-  the remaining length is 1 (section 3.14.2), so this form is
-  accepted, and reads as that reason code with an empty
-  property block.
+  property block. "If the Remaining Length is less than 2, a
+  value of 0 is used" for the property length (section
+  3.14.2.2.1), so this form is accepted.
 - A remaining length of 2 or more: one reason code byte, then
   a DISCONNECT property block that fills the rest of the body
   exactly.
 
-The printer always writes the second kind of packet with an
-explicit property block, so a packet read from the one byte
-form is reprinted in the longer form: the packet with reason
-code 0 and no properties prints as remaining length 2, reason
-0, property length 0. Reason code values are not checked
-beyond being bytes.
+The packet value keeps which form arrived: no body, a reason
+code alone, or a reason code and a property block. The
+printer writes each form back as it came, so the one byte
+form with reason code 0 prints as remaining length 1, reason
+0, and the form with an empty property block prints as
+remaining length 2, reason 0, property length 0. Reason code
+values are not checked beyond being bytes.
 
 ## The reader
 
@@ -351,8 +351,8 @@ fields the printer can write exactly. In outline:
   each filter keeping the filter rules above.
 - SUBACK: a nonzero packet identifier and a nonempty reason
   list of byte values.
-- DISCONNECT with a body: a reason code below 256 and a well
-  formed property block.
+- DISCONNECT with a body: a reason code below 256, and a well
+  formed property block when one stands.
 
 ## The printer
 
@@ -386,8 +386,8 @@ reads. The empty payload is the empty byte list and answers
 Example: the request `parse 192,0` is a PINGREQ. The answer
 is `ok:192,0`. The request `parse 224,1,0` is the one byte
 body form of DISCONNECT with reason code 0. The answer is
-`ok:224,2,0,0`: the same packet reprinted with its explicit
-property block.
+`ok:224,1,0`: the same packet, reprinted in the form it came
+in.
 
 The tool prints only the re-encoded bytes. It does not print
 a rendering of the packet, so test harnesses check the parsed
@@ -428,5 +428,6 @@ inputs.
 | SUBSCRIBE topic filters that break the filter rules are refused, one example input each: `a/#/b`, `a+`, the empty filter, `$share/g/t` with No Local, and `$share/g`; `a/+/#` and `$share/g/t` without No Local are accepted | `Spec.rejects_bad_topic_filters` |
 | A SUBSCRIBE with packet identifier 0 is refused | `Spec.rejects_subscribe_id_zero` |
 | Property values the standard calls a Protocol Error are refused, one example input each: a Subscription Identifier, Topic Alias, Receive Maximum or Maximum Packet Size of 0, a Request Problem Information or Request Response Information of 2, Authentication Data without an Authentication Method, and a Response Topic that holds a wildcard or is empty | `Spec.rejects_property_value_rules` |
+| A DISCONNECT with a one byte body reads as a reason code with no property block and prints back as the same bytes; one with a reason code and an empty property block does the same in its own form (one example of each) | `Spec.disconnect_short_form` |
 | A PINGREQ with a body is refused | `Spec.rejects_pingreq_body` |
 | A packet type outside the seven in this slice is refused | `Spec.rejects_unknown_type` |

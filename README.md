@@ -78,6 +78,7 @@ where they end in `sorry`) and proved in
 | SUBSCRIBE topic filters that break the standard's filter rules are refused, one example input each: `a/#/b` (`#` not last), `a+` (`+` not alone in its level), the empty filter, `$share/g/t` with No Local set, and `$share/g` (no filter after the ShareName). The filters `a/+/#` and `$share/g/t` with No Local clear are accepted. | `Spec.rejects_bad_topic_filters` |
 | A SUBSCRIBE with packet identifier 0 is refused. | `Spec.rejects_subscribe_id_zero` |
 | Property values the standard calls a Protocol Error are refused, one example input each: a Subscription Identifier of 0 on a SUBSCRIBE, a Topic Alias of 0 on a PUBLISH, a Receive Maximum of 0, a Maximum Packet Size of 0, a Request Problem Information of 2, a Request Response Information of 2, and Authentication Data with no Authentication Method on a CONNECT, and a Response Topic `#` and an empty Response Topic on a PUBLISH. | `Spec.rejects_property_value_rules` |
+| The DISCONNECT 224, 1, 0 (a reason code with no property block) reads as that form and prints back as the same three bytes, and the DISCONNECT 224, 2, 0, 0 (a reason code and an empty property block) reads as that form and prints back as the same four bytes. | `Spec.disconnect_short_form` |
 | A PINGREQ with a body is refused: its remaining length must be 0. | `Spec.rejects_pingreq_body` |
 | A packet type outside the seven in this slice, here type 2, is refused. | `Spec.rejects_unknown_type` |
 

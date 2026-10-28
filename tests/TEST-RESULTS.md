@@ -8,7 +8,7 @@ Mosquitto was NOT present on this machine (no `mosquitto` or `mosquitto_sub` bin
 
 | Section | Inputs | Agreements |
 | --- | --- | --- |
-| Fixed cases (spec VBI table, one packet per type, richer hand built packets) | 35 | 35 |
+| Fixed cases (spec VBI table, one packet per type, richer hand built packets) | 37 | 37 |
 | Oracle differential, random packets of all seven types (seed 20261026) | 3000 | 3000 |
 | Paho 2.1.0 cross-check (variable byte integers as Subscription Identifiers, and PUBLISH property blocks) | 378 | 378 |
 | Mutations and named rejections, settled by the oracle | 325 | 325 |

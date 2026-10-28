@@ -798,43 +798,61 @@ theorem readSubackBody_printSubackBody (id : Nat) (ps : List Property)
   rw [if_pos (by rw [h2]; rfl : (!(rs.map Nat.toUInt8).isEmpty) = true),
     map_toUInt8_toNat rs hrs.2]
 
-/-- A printed DISCONNECT body reads back as the packet. -/
-theorem readDisconnectBody_print (x : Option (Nat × List Property))
+/-- A printed DISCONNECT body reads back as the packet, in each
+    of its three forms. -/
+theorem readDisconnectBody_print (x : Option (Nat × Option (List Property)))
     (h : match x with
       | none => True
-      | some (rc, ps) => rc < 256 ∧ PropsBlockWF PropSet.disconnect ps) :
+      | some (rc, none) => rc < 256
+      | some (rc, some ps) => rc < 256 ∧ PropsBlockWF PropSet.disconnect ps) :
     readDisconnectBody (bodyOf (Packet.disconnect x))
       = some (Packet.disconnect x) := by
   cases x with
   | none => rfl
   | some rp =>
-    obtain ⟨rc, ps⟩ := rp
-    obtain ⟨hrc, hps⟩ := h
-    show readDisconnectBody ([rc.toUInt8] ++ printProps ps)
-        = some (Packet.disconnect (some (rc, ps)))
-    rw [show [rc.toUInt8] ++ printProps ps = rc.toUInt8 :: printProps ps from rfl]
-    have hpos : 0 < (printProps ps).length := by
-      show 0 < (printVBI (printPropsList ps).length
-        ++ printPropsList ps).length
-      rw [List.length_append]
-      have h1 := printVBI_pos (printPropsList ps).length
-      omega
-    have hne : ¬ ((printProps ps).isEmpty = true) := by
-      intro hcon
-      rw [List.isEmpty_iff] at hcon
-      have hz : (printProps ps).length = 0 := congrArg List.length hcon
-      omega
-    show (if (printProps ps).isEmpty
-        then some (Packet.disconnect (some ((rc.toUInt8).toNat, [])))
-        else (readProps PropSet.disconnect (printProps ps)).bind
-          fun (props, r2) =>
-          if r2.isEmpty
-            then some (Packet.disconnect (some ((rc.toUInt8).toNat, props)))
-            else none) = some (Packet.disconnect (some (rc, ps)))
-    rw [if_neg hne]
-    simp only [readProps_printProps_exact PropSet.disconnect ps hps,
-      Option.bind_some]
-    rw [if_pos (by decide : List.isEmpty [] = true), toNat_toUInt8 hrc]
+    obtain ⟨rc, ops⟩ := rp
+    cases ops with
+    | none =>
+      have hrc : rc < 256 := h
+      show readDisconnectBody [rc.toUInt8]
+          = some (Packet.disconnect (some (rc, none)))
+      show (if ([] : List UInt8).isEmpty
+          then some (Packet.disconnect (some ((rc.toUInt8).toNat, none)))
+          else (readProps PropSet.disconnect []).bind
+            fun (props, r2) =>
+            if r2.isEmpty
+              then some (Packet.disconnect (some ((rc.toUInt8).toNat, some props)))
+              else none) = some (Packet.disconnect (some (rc, none)))
+      rw [ite_eq_left (by decide : List.isEmpty ([] : List UInt8) = true),
+        toNat_toUInt8 hrc]
+    | some ps =>
+      obtain ⟨hrc, hps⟩ := h
+      show readDisconnectBody ([rc.toUInt8] ++ printProps ps)
+          = some (Packet.disconnect (some (rc, some ps)))
+      rw [show [rc.toUInt8] ++ printProps ps = rc.toUInt8 :: printProps ps from rfl]
+      have hpos : 0 < (printProps ps).length := by
+        show 0 < (printVBI (printPropsList ps).length
+          ++ printPropsList ps).length
+        rw [List.length_append]
+        have h1 := printVBI_pos (printPropsList ps).length
+        omega
+      have hne : ¬ ((printProps ps).isEmpty = true) := by
+        intro hcon
+        rw [List.isEmpty_iff] at hcon
+        have hz : (printProps ps).length = 0 := congrArg List.length hcon
+        omega
+      show (if (printProps ps).isEmpty
+          then some (Packet.disconnect (some ((rc.toUInt8).toNat, none)))
+          else (readProps PropSet.disconnect (printProps ps)).bind
+            fun (props, r2) =>
+            if r2.isEmpty
+              then some (Packet.disconnect (some ((rc.toUInt8).toNat, some props)))
+              else none) = some (Packet.disconnect (some (rc, some ps)))
+      rw [ite_eq_right hne]
+      simp only [readProps_printProps_exact PropSet.disconnect ps hps,
+        Option.bind_some]
+      rw [ite_eq_left (by decide : List.isEmpty ([] : List UInt8) = true),
+        toNat_toUInt8 hrc]
 
 /-- The facts about a well formed connect flags byte: it
     fits in a byte, the reserved bit is clear, and every field
@@ -1317,15 +1335,25 @@ theorem parseBody_disconnect_none :
   rw [if_pos rfl, readDisconnectBody_print none trivial]
 
 /-- The body dispatcher on a printed DISCONNECT body with a
+    reason code alone. -/
+theorem parseBody_disconnect_short (rc : Nat) (h : rc < 256) :
+    parseBody 14 0 (bodyOf (.disconnect (some (rc, none))))
+      = some (.disconnect (some (rc, none))) := by
+  show (if (0 : Nat) = 0
+      then readDisconnectBody (bodyOf (.disconnect (some (rc, none))))
+      else none) = some (.disconnect (some (rc, none)))
+  rw [ite_eq_left rfl, readDisconnectBody_print (some (rc, none)) h]
+
+/-- The body dispatcher on a printed DISCONNECT body with a
     reason code and properties. -/
 theorem parseBody_disconnect_some (rc : Nat) (ps : List Property)
     (h : rc < 256 ∧ PropsBlockWF PropSet.disconnect ps) :
-    parseBody 14 0 (bodyOf (.disconnect (some (rc, ps))))
-      = some (.disconnect (some (rc, ps))) := by
+    parseBody 14 0 (bodyOf (.disconnect (some (rc, some ps))))
+      = some (.disconnect (some (rc, some ps))) := by
   show (if (0 : Nat) = 0
-      then readDisconnectBody (bodyOf (.disconnect (some (rc, ps))))
-      else none) = some (.disconnect (some (rc, ps)))
-  rw [if_pos rfl, readDisconnectBody_print (some (rc, ps)) h]
+      then readDisconnectBody (bodyOf (.disconnect (some (rc, some ps))))
+      else none) = some (.disconnect (some (rc, some ps)))
+  rw [ite_eq_left rfl, readDisconnectBody_print (some (rc, some ps)) h]
 
 /-- One packet at the head of a stream: a printed packet
     followed by any bytes parses to the packet and leaves
@@ -1424,9 +1452,14 @@ theorem parsePacket_print (p : Packet) (rest : List UInt8) (h : PacketWF p) :
     | none =>
       simp only [parseBody_disconnect_none, Option.bind_some]
     | some rp =>
-      obtain ⟨rc, ps⟩ := rp
-      have h2 : rc < 256 ∧ PropsBlockWF PropSet.disconnect ps := hfields
-      simp only [parseBody_disconnect_some rc ps h2, Option.bind_some]
+      obtain ⟨rc, ops⟩ := rp
+      cases ops with
+      | none =>
+        have h2 : rc < 256 := hfields
+        simp only [parseBody_disconnect_short rc h2, Option.bind_some]
+      | some ps =>
+        have h2 : rc < 256 ∧ PropsBlockWF PropSet.disconnect ps := hfields
+        simp only [parseBody_disconnect_some rc ps h2, Option.bind_some]
 
 /-- The main round trip claim: a well formed packet,
     printed and parsed back on its own, is the same

@@ -181,6 +181,15 @@ theorem Spec.rejects_property_value_rules :
   decide +kernel
 
 
+theorem Spec.disconnect_short_form :
+    parse ([224, 1, 0] : List UInt8) = some (.disconnect (some (0, none)))
+    ∧ print (.disconnect (some (0, none))) = [224, 1, 0]
+    ∧ parse ([224, 2, 0, 0] : List UInt8)
+      = some (.disconnect (some (0, some [])))
+    ∧ print (.disconnect (some (0, some []))) = [224, 2, 0, 0] := by
+  decide +kernel
+
+
 theorem Spec.rejects_pingreq_body :
     (parse ([192, 1, 0] : List UInt8)).isSome = false := by
   decide +kernel
