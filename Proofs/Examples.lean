@@ -7,10 +7,9 @@
   through the command line tool in the test harness, where
   they are checked byte by byte a second time.
 
-  The examples are stated on the reading side. The printer's
-  variable byte integer is defined by well founded recursion,
-  which the kernel will not evaluate here; the round trip
-  theorem covers the printer instead.
+  The examples are stated on the reading side. The round trip
+  and soundness theorems cover the printer in general, and
+  `Spec.disconnect_short_form` evaluates it on two packets.
 -/
 
 import Mqtt

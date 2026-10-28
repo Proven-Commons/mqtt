@@ -60,7 +60,7 @@ theorem readBytes_append : ∀ (n : Nat) (bs rest : List UInt8),
     bs.length = n → readBytes n (bs ++ rest) = some (bs, rest) := by
   intro n bs rest h
   unfold readBytes
-  rw [if_pos (by simp [List.length_append, h] : (bs ++ rest).length ≥ n),
+  rw [ite_eq_left (by simp [List.length_append, h] : (bs ++ rest).length ≥ n),
     ← h, List.take_left, List.drop_left]
 
 /-! ## The variable byte integer -/
@@ -70,8 +70,8 @@ theorem printVBI_pos : ∀ (n : Nat), 0 < (printVBI n).length := by
   intro n
   rw [printVBI_def]
   by_cases h : n < 128
-  · rw [if_pos h]; simp
-  · rw [if_neg h]; simp
+  · rw [ite_eq_left h]; simp
+  · rw [ite_eq_right h]; simp
 
 /-- Reading a printed variable byte integer, with the counting
     form of the reader: with at most `k + 1` bytes to spend and
@@ -465,7 +465,7 @@ theorem readEntry_printProperty (s : PropSet) (seen : List Nat) (p : Property)
   rw [readEntry_step, printProperty, List.append_assoc,
     decVBI_printVBI p.id _ (propTypeOf_id_lt hty)]
   simp only [Option.bind_some]
-  rw [if_pos (by rw [hc, hr]; rfl), hty]
+  rw [ite_eq_left (by rw [hc, hr]; rfl), hty]
   simp only []
   rw [readPropVal_printPropVal p.val rest hval]
   simp only [Option.bind_some]
@@ -506,7 +506,7 @@ theorem readEntriesGo_printPropsList : ∀ (fuel : Nat) (s : PropSet)
       obtain ⟨hid, hty, hval, hok, hrep, htail⟩ := hwf
       rw [List.length_cons] at hlen
       show readEntriesGo (fuel + 1) s seen (printPropsList (p :: ps')) = _
-      rw [printPropsList, readEntriesGo, if_neg hne,
+      rw [printPropsList, readEntriesGo, ite_eq_right hne,
         readEntry_printProperty s seen p (printPropsList ps') hid hty hval hok hrep]
       simp only []
       rw [ih s (p.id :: seen) ps' (by omega) htail]
@@ -571,7 +571,7 @@ theorem checkTopic_of_wf {s : List Char} (h : TopicWF s) : checkTopic s = some s
     any_eq_false_of_not_mem hh
   unfold checkTopic
   rw [e1, e2, e3]
-  exact if_neg (by decide)
+  exact ite_eq_right (by decide)
 
 /-- The wildcard check passes on a PUBLISH topic name fit to
     print. -/
@@ -603,7 +603,7 @@ theorem optsByte_fields (q rh a b : Nat) (hq : q ≤ 2) (hr : rh ≤ 2)
     (ha : a ≤ 1) (hb : b ≤ 1) :
     readOptsByte (q + a * 4 + b * 8 + rh * 16) = some ⟨q, a = 1, b = 1, rh⟩ := by
   unfold readOptsByte
-  rw [if_pos ⟨by omega, by omega, by omega⟩]
+  rw [ite_eq_left ⟨by omega, by omega, by omega⟩]
   simp only [Option.some.injEq, SubOpts.mk.injEq]
   refine ⟨by omega, ?_, ?_, by omega⟩
   · rw [show (q + a * 4 + b * 8 + rh * 16) / 4 % 2 = a by omega]
@@ -680,7 +680,7 @@ theorem readFiltersGo_printFilters : ∀ (fuel : Nat)
         exact absurd h1 (by decide)
       rw [List.length_cons] at hlen
       show readFiltersGo (fuel + 1) (printFilters ((f, o) :: fs')) = _
-      rw [printFilters, readFiltersGo, if_neg hne, printFilter,
+      rw [printFilters, readFiltersGo, ite_eq_right hne, printFilter,
         List.append_assoc, readStr_printStr f _ hf]
       rw [List.cons_append, List.nil_append]
       simp only []
@@ -749,7 +749,7 @@ theorem readSubscribeBody_printSubscribeBody (id : Nat) (ps : List Property)
       = writeBE 2 id ++ (printProps ps ++ printFilters fs) from rfl,
     readNat_writeBE 2 id _ (by omega)]
   simp only [Option.bind_some]
-  rw [if_pos (by omega : id ≠ 0), readProps_printProps .subscribe ps _ hps]
+  rw [ite_eq_left (by omega : id ≠ 0), readProps_printProps .subscribe ps _ hps]
   simp only [Option.bind_some]
   rw [readFiltersGo_printFilters (printFilters fs).length fs
     (printFilters_length_ge fs) hfs.2]
@@ -758,7 +758,7 @@ theorem readSubscribeBody_printSubscribeBody (id : Nat) (ps : List Property)
     cases fs with
     | nil => exact absurd rfl hfs.1
     | cons a t => rfl
-  rw [if_pos (by rw [h2]; rfl : ([].isEmpty && !fs.isEmpty) = true)]
+  rw [ite_eq_left (by rw [h2]; rfl : ([].isEmpty && !fs.isEmpty) = true)]
 
 /-- Reason codes written as bytes read back as themselves. -/
 theorem map_toUInt8_toNat (rs : List Nat) (h : ∀ r ∈ rs, r < 256) :
@@ -789,13 +789,13 @@ theorem readSubackBody_printSubackBody (id : Nat) (ps : List Property)
       = writeBE 2 id ++ (printProps ps ++ rs.map Nat.toUInt8) from rfl,
     readNat_writeBE 2 id _ (by omega)]
   simp only [Option.bind_some]
-  rw [if_pos (by omega : id ≠ 0), readProps_printProps .suback ps _ hps]
+  rw [ite_eq_left (by omega : id ≠ 0), readProps_printProps .suback ps _ hps]
   simp only [Option.bind_some]
   have h2 : (rs.map Nat.toUInt8).isEmpty = false := by
     cases rs with
     | nil => exact absurd rfl hrs.1
     | cons a t => rfl
-  rw [if_pos (by rw [h2]; rfl : (!(rs.map Nat.toUInt8).isEmpty) = true),
+  rw [ite_eq_left (by rw [h2]; rfl : (!(rs.map Nat.toUInt8).isEmpty) = true),
     map_toUInt8_toNat rs hrs.2]
 
 /-- A printed DISCONNECT body reads back as the packet, in each
@@ -1037,42 +1037,42 @@ theorem readOptFields (u : Option (List Char)) (p : Option (List UInt8))
   | none =>
     rw [show printOptStr none = [] from rfl, List.nil_append]
     unfold readOptStrField
-    rw [if_neg (by decide : ¬ (Option.isSome none = true))]
+    rw [ite_eq_right (by decide : ¬ (Option.isSome none = true))]
     simp only [Option.bind_some]
     cases p with
     | none =>
       rw [show printOptBin none = [] from rfl]
       unfold readOptBinField
-      rw [if_neg (by decide : ¬ (Option.isSome none = true))]
+      rw [ite_eq_right (by decide : ¬ (Option.isSome none = true))]
       simp only [Option.bind_some]
-      rw [if_pos (by decide : List.isEmpty [] = true)]
+      rw [ite_eq_left (by decide : List.isEmpty [] = true)]
     | some b =>
       rw [show printOptBin (some b) = printBin b from rfl]
       unfold readOptBinField
-      rw [if_pos (by rfl : Option.isSome (some b) = true),
+      rw [ite_eq_left (by rfl : Option.isSome (some b) = true),
         ← List.append_nil (printBin b), readBin_printBin b [] (hp b rfl)]
       simp only [Option.map_some, Option.bind_some]
-      rw [if_pos (by decide : List.isEmpty [] = true)]
+      rw [ite_eq_left (by decide : List.isEmpty [] = true)]
   | some s =>
     rw [show printOptStr (some s) = printStr s from rfl]
     unfold readOptStrField
-    rw [if_pos (by rfl : Option.isSome (some s) = true),
+    rw [ite_eq_left (by rfl : Option.isSome (some s) = true),
       readStr_printStr s _ (hu s rfl)]
     simp only [Option.map_some, Option.bind_some]
     cases p with
     | none =>
       rw [show printOptBin none = [] from rfl]
       unfold readOptBinField
-      rw [if_neg (by decide : ¬ (Option.isSome none = true))]
+      rw [ite_eq_right (by decide : ¬ (Option.isSome none = true))]
       simp only [Option.bind_some]
-      rw [if_pos (by decide : List.isEmpty [] = true)]
+      rw [ite_eq_left (by decide : List.isEmpty [] = true)]
     | some b =>
       rw [show printOptBin (some b) = printBin b from rfl]
       unfold readOptBinField
-      rw [if_pos (by rfl : Option.isSome (some b) = true),
+      rw [ite_eq_left (by rfl : Option.isSome (some b) = true),
         ← List.append_nil (printBin b), readBin_printBin b [] (hp b rfl)]
       simp only [Option.map_some, Option.bind_some]
-      rw [if_pos (by decide : List.isEmpty [] = true)]
+      rw [ite_eq_left (by decide : List.isEmpty [] = true)]
 
 /-- A printed CONNECT body reads back as the packet. -/
 theorem readConnectBody_printConnectBody (c : Connect) (h : ConnectWF c) :
@@ -1099,17 +1099,17 @@ theorem readConnectBody_printConnectBody (c : Connect) (h : ConnectWF c) :
       from rfl,
     readStr_printStr _ _ hproto]
   simp only [Option.bind_some]
-  rw [if_pos trivial]
+  rw [ite_eq_left trivial]
   simp only [List.cons_append, List.nil_append]
   rw [readByte_cons]
   simp only [Option.bind_some]
-  rw [if_pos (by decide : (5 : UInt8).toNat = 5), readByte_cons]
+  rw [ite_eq_left (by decide : (5 : UInt8).toNat = 5), readByte_cons]
   simp only [Option.bind_some]
-  rw [hf1, if_pos hf2]
+  rw [hf1, ite_eq_left hf2]
   by_cases hwn : c.will = none
   · have hf3' : (connectFlags c / 8) % 4 = 0 := by rw [hf3, hwn]
     have hf7' : flagBit (connectFlags c) 2 = false := by simp [hf7, hwn]
-    rw [if_pos (by rw [hf3']; omega : (connectFlags c / 8) % 4 ≠ 3),
+    rw [ite_eq_left (by rw [hf3']; omega : (connectFlags c / 8) % 4 ≠ 3),
       ite_eq_left (by rw [hf9 hwn]; simp :
         (flagBit (connectFlags c) 2 || decide ((connectFlags c / 8) % 8 = 0)) = true),
       readNat_writeBE 2 c.keepAlive _ (by omega)]
@@ -1120,7 +1120,7 @@ theorem readConnectBody_printConnectBody (c : Connect) (h : ConnectWF c) :
     simp only [Option.bind_some]
     rw [hwn, show printWillPart none = [] from rfl, List.nil_append]
     unfold readWillPart
-    rw [if_neg (by rw [hf7']; decide : ¬ (flagBit (connectFlags c) 2 = true))]
+    rw [ite_eq_right (by rw [hf7']; decide : ¬ (flagBit (connectFlags c) 2 = true))]
     simp only [Option.bind_some]
     rw [readOptFields c.username c.password huser hpass c.cleanStart
       c.keepAlive c.props c.clientId none (flagBit (connectFlags c) 7)
@@ -1139,7 +1139,7 @@ theorem readConnectBody_printConnectBody (c : Connect) (h : ConnectWF c) :
     have hf3' : (connectFlags c / 8) % 4 = wq := by rw [hf3, hw]
     have hf6' : flagBit (connectFlags c) 5 = wr := by rw [hf6, hw]
     have hf7' : flagBit (connectFlags c) 2 = true := by simp [hf7, hw]
-    rw [if_pos (by rw [hf3']; omega : (connectFlags c / 8) % 4 ≠ 3),
+    rw [ite_eq_left (by rw [hf3']; omega : (connectFlags c / 8) % 4 ≠ 3),
       ite_eq_left (by rw [hf7']; rfl :
         (flagBit (connectFlags c) 2 || decide ((connectFlags c / 8) % 8 = 0)) = true),
       readNat_writeBE 2 c.keepAlive _ (by omega)]
@@ -1151,7 +1151,7 @@ theorem readConnectBody_printConnectBody (c : Connect) (h : ConnectWF c) :
     rw [hw, show printWillPart (some ⟨wq, wr, wps, wt, wpay⟩)
         = printProps wps ++ (printStr wt ++ printBin wpay) from rfl]
     unfold readWillPart
-    rw [if_pos hf7', List.append_assoc, readProps_printProps .will wps _ hwprops]
+    rw [ite_eq_left hf7', List.append_assoc, readProps_printProps .will wps _ hwprops]
     simp only [Option.bind_some]
     rw [List.append_assoc, readStr_printStr wt _ hwtopic.1]
     simp only [Option.bind_some]
@@ -1173,7 +1173,7 @@ theorem readPacketId_qos0 (flags : Nat) (r : List UInt8)
     (h : (flags / 2) % 4 = 0) :
     readPacketId flags r = some (none, r) := by
   unfold readPacketId
-  rw [if_pos h]
+  rw [ite_eq_left h]
 
 /-- The packet identifier step at QoS 1 and 2 reads a printed
     nonzero identifier. -/
@@ -1181,10 +1181,10 @@ theorem readPacketId_print (flags : Nat) (i : Nat) (rest : List UInt8)
     (h : (flags / 2) % 4 ≠ 0) (hi : 1 ≤ i ∧ i < 65536) :
     readPacketId flags (printIdOpt (some i) ++ rest) = some (some i, rest) := by
   unfold readPacketId
-  rw [if_neg h, show printIdOpt (some i) = writeBE 2 i from rfl,
+  rw [ite_eq_right h, show printIdOpt (some i) = writeBE 2 i from rfl,
     readNat_writeBE 2 i _ (by omega)]
   simp only [Option.bind_some]
-  rw [if_pos (by omega : i ≠ 0)]
+  rw [ite_eq_left (by omega : i ≠ 0)]
 
 /-- A printed PUBLISH body reads back as the packet, when the
     flags word carries the packet's own QoS, DUP and RETAIN. -/
@@ -1294,7 +1294,7 @@ theorem parseBody_publish (pub : Publish) (h : PublishWF pub) :
         ∧ flagBit (publishHeader pub % 16) 3 = true then none
     else (readPublishBody (publishHeader pub % 16) (printPublishBody pub)).map
       Packet.publish) = some (.publish pub)
-  rw [hmod, if_neg (by rw [hb.1]; omega :
+  rw [hmod, ite_eq_right (by rw [hb.1]; omega :
       ¬ ((if pub.dup then 8 else 0) + pub.qos * 2
         + (if pub.retain then 1 else 0)) / 2 % 4 = 3),
     ite_eq_right hdup,
@@ -1309,7 +1309,7 @@ theorem parseBody_subscribe (id : Nat) (ps : List Property)
       = some (.subscribe id ps fs) := by
   show (if (2 : Nat) = 2 then readSubscribeBody (printSubscribeBody id ps fs)
     else none) = some (.subscribe id ps fs)
-  rw [if_pos rfl, readSubscribeBody_printSubscribeBody id ps fs hid hps hfs]
+  rw [ite_eq_left rfl, readSubscribeBody_printSubscribeBody id ps fs hid hps hfs]
 
 /-- The body dispatcher on a printed SUBACK body. -/
 theorem parseBody_suback (id : Nat) (ps : List Property) (rs : List Nat)
@@ -1318,7 +1318,7 @@ theorem parseBody_suback (id : Nat) (ps : List Property) (rs : List Nat)
     parseBody 9 0 (printSubackBody id ps rs) = some (.suback id ps rs) := by
   show (if (0 : Nat) = 0 then readSubackBody (printSubackBody id ps rs)
     else none) = some (.suback id ps rs)
-  rw [if_pos rfl, readSubackBody_printSubackBody id ps rs hid hps hrs]
+  rw [ite_eq_left rfl, readSubackBody_printSubackBody id ps rs hid hps hrs]
 
 /-- The body dispatcher on an empty PINGREQ body: a closed
     computation. -/
@@ -1332,7 +1332,7 @@ theorem parseBody_disconnect_none :
     parseBody 14 0 (bodyOf (.disconnect none)) = some (.disconnect none) := by
   show (if (0 : Nat) = 0 then readDisconnectBody (bodyOf (.disconnect none))
     else none) = some (.disconnect none)
-  rw [if_pos rfl, readDisconnectBody_print none trivial]
+  rw [ite_eq_left rfl, readDisconnectBody_print none trivial]
 
 /-- The body dispatcher on a printed DISCONNECT body with a
     reason code alone. -/

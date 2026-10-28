@@ -34,22 +34,22 @@ theorem char_bounds (c : Char) :
 theorem contVal_of_toNat {b : UInt8} {k : Nat} (h : b.toNat = 0x80 + k) (hk : k < 64) :
     contVal b = some k := by
   unfold contVal
-  rw [h, if_pos ⟨by omega, by omega⟩, Nat.add_sub_cancel_left]
+  rw [h, ite_eq_left ⟨by omega, by omega⟩, Nat.add_sub_cancel_left]
 
 /-- One step of the decoder on a plain byte. -/
 theorem decode_one (b : UInt8) (bs : List UInt8) (hb : b.toNat < 0x80) :
     decode (b :: bs) = (decode bs).map (Char.ofNat b.toNat :: ·) := by
   cases bs with
-  | nil => rw [decode.eq_3, if_pos hb]
-  | cons b1 bs' => rw [decode.eq_2, if_pos hb]
+  | nil => rw [decode.eq_3, ite_eq_left hb]
+  | cons b1 bs' => rw [decode.eq_2, ite_eq_left hb]
 
 /-- One step of the decoder on a two byte form. -/
 theorem decode_two (b b1 : UInt8) (bs : List UInt8) (v : Nat)
     (hb : 0xC2 ≤ b.toNat ∧ b.toNat < 0xE0) (hv : contVal b1 = some v) :
     decode (b :: b1 :: bs) =
       (decode bs).map (Char.ofNat ((b.toNat - 0xC0) * 64 + v) :: ·) := by
-  rw [decode.eq_2, if_neg (by omega : ¬ b.toNat < 0x80),
-    if_neg (by omega : ¬ b.toNat < 0xC2), if_pos (by omega : b.toNat < 0xE0), hv]
+  rw [decode.eq_2, ite_eq_right (by omega : ¬ b.toNat < 0x80),
+    ite_eq_right (by omega : ¬ b.toNat < 0xC2), ite_eq_left (by omega : b.toNat < 0xE0), hv]
 
 /-- One step of the decoder on a three byte form. -/
 theorem decode_three (b b1 b2 : UInt8) (bs : List UInt8) (v1 v2 : Nat)
@@ -58,13 +58,13 @@ theorem decode_three (b b1 b2 : UInt8) (bs : List UInt8) (v1 v2 : Nat)
     (hv1 : contVal b1 = some v1) (hv2 : contVal b2 = some v2) :
     decode (b :: b1 :: b2 :: bs) =
       (decode bs).map (Char.ofNat ((b.toNat - 0xE0) * 4096 + v1 * 64 + v2) :: ·) := by
-  rw [decode.eq_2, if_neg (by omega : ¬ b.toNat < 0x80),
-    if_neg (by omega : ¬ b.toNat < 0xC2), if_neg (by omega : ¬ b.toNat < 0xE0),
-    if_pos (by omega : b.toNat < 0xF0)]
+  rw [decode.eq_2, ite_eq_right (by omega : ¬ b.toNat < 0x80),
+    ite_eq_right (by omega : ¬ b.toNat < 0xC2), ite_eq_right (by omega : ¬ b.toNat < 0xE0),
+    ite_eq_left (by omega : b.toNat < 0xF0)]
   dsimp only
   rw [hv1, hv2]
   dsimp only
-  rw [if_pos hside]
+  rw [ite_eq_left hside]
 
 /-- One step of the decoder on a four byte form. -/
 theorem decode_four (b b1 b2 b3 : UInt8) (bs : List UInt8) (v1 v2 v3 : Nat)
@@ -75,13 +75,13 @@ theorem decode_four (b b1 b2 b3 : UInt8) (bs : List UInt8) (v1 v2 v3 : Nat)
     decode (b :: b1 :: b2 :: b3 :: bs) =
       (decode bs).map
         (Char.ofNat ((b.toNat - 0xF0) * 262144 + v1 * 4096 + v2 * 64 + v3) :: ·) := by
-  rw [decode.eq_2, if_neg (by omega : ¬ b.toNat < 0x80),
-    if_neg (by omega : ¬ b.toNat < 0xC2), if_neg (by omega : ¬ b.toNat < 0xE0),
-    if_neg (by omega : ¬ b.toNat < 0xF0), if_pos (by omega : b.toNat < 0xF5)]
+  rw [decode.eq_2, ite_eq_right (by omega : ¬ b.toNat < 0x80),
+    ite_eq_right (by omega : ¬ b.toNat < 0xC2), ite_eq_right (by omega : ¬ b.toNat < 0xE0),
+    ite_eq_right (by omega : ¬ b.toNat < 0xF0), ite_eq_left (by omega : b.toNat < 0xF5)]
   dsimp only
   rw [hv1, hv2, hv3]
   dsimp only
-  rw [if_pos hside]
+  rw [ite_eq_left hside]
 
 /-- Decoding one encoded character in front of any bytes decodes
     the character and then the bytes. The four cases are the
@@ -92,24 +92,24 @@ theorem decode_append_char (c : Char) (bs : List UInt8) :
     decode (encodeChar c ++ bs) = (decode bs).map (c :: ·) := by
   obtain ⟨hmax, hnsur⟩ := char_bounds c
   by_cases h1 : c.toNat < 0x80
-  · rw [encodeChar, if_pos h1, List.cons_append, List.nil_append,
+  · rw [encodeChar, ite_eq_left h1, List.cons_append, List.nil_append,
       decode_one _ _ (by rw [toNat_toUInt8 (by omega)]; exact h1),
       toNat_toUInt8 (by omega), Char.ofNat_toNat]
-  · rw [encodeChar, if_neg h1]
+  · rw [encodeChar, ite_eq_right h1]
     by_cases h2 : c.toNat < 0x800
     · have hlead : (0xC0 + c.toNat / 64).toUInt8.toNat = 0xC0 + c.toNat / 64 :=
         toNat_toUInt8 (by omega)
-      rw [if_pos h2, List.cons_append, List.cons_append, List.nil_append,
+      rw [ite_eq_left h2, List.cons_append, List.cons_append, List.nil_append,
         decode_two _ _ _ _ ⟨by omega, by omega⟩
           (contVal_of_toNat (toNat_toUInt8 (by omega)) (Nat.mod_lt _ (by decide))),
         hlead,
         show (0xC0 + c.toNat / 64 - 0xC0) * 64 + c.toNat % 64 = c.toNat by omega,
         Char.ofNat_toNat]
-    · rw [if_neg h2]
+    · rw [ite_eq_right h2]
       by_cases h3 : c.toNat < 0x10000
       · have hlead : (0xE0 + c.toNat / 4096).toUInt8.toNat = 0xE0 + c.toNat / 4096 :=
           toNat_toUInt8 (by omega)
-        rw [if_pos h3, List.cons_append, List.cons_append, List.cons_append,
+        rw [ite_eq_left h3, List.cons_append, List.cons_append, List.cons_append,
           List.nil_append,
           decode_three _ _ _ _ _ _ ⟨by omega, by omega⟩
             ⟨fun hb => by rw [hlead] at hb; omega,
@@ -122,7 +122,7 @@ theorem decode_append_char (c : Char) (bs : List UInt8) :
           Char.ofNat_toNat]
       · have hlead : (0xF0 + c.toNat / 262144).toUInt8.toNat = 0xF0 + c.toNat / 262144 :=
           toNat_toUInt8 (by omega)
-        rw [if_neg h3, List.cons_append, List.cons_append, List.cons_append,
+        rw [ite_eq_right h3, List.cons_append, List.cons_append, List.cons_append,
           List.cons_append, List.nil_append,
           decode_four _ _ _ _ _ _ _ _ ⟨by omega, by omega⟩
             ⟨fun hb => by rw [hlead] at hb; omega,
