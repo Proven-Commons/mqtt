@@ -1,0 +1,17 @@
+name = "mqtt"
+version = "0.1.0"
+license = "Apache-2.0"
+defaultTargets = ["Mqtt", "Proofs", "mqtt"]
+
+[[lean_lib]]
+name = "Mqtt"
+
+[[lean_lib]]
+name = "Proofs"
+
+[[lean_lib]]
+name = "Spec"
+
+[[lean_exe]]
+name = "mqtt"
+root = "Main"

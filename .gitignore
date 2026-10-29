@@ -1,1 +1,4 @@
 .lake/
+venv/
+scratch/
+__pycache__/
