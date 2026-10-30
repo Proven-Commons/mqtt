@@ -12,7 +12,7 @@
 -/
 
 import Mqtt
-import Proofs.Utf8
+import Mqtt.Proofs.Utf8
 
 namespace Mqtt.Proofs
 

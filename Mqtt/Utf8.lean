@@ -15,7 +15,7 @@
   a draft pull request that is not merged (jws main has no such
   file), with the namespace renamed. The repos in this programme
   do not share a library, so the code travels. Its proof is
-  included here, in Proofs/Utf8.lean.
+  included here, in Mqtt/Proofs/Utf8.lean.
 -/
 
 namespace Mqtt.Utf8

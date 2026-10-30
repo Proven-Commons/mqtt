@@ -1,16 +1,18 @@
 name = "mqtt"
 version = "0.1.0"
 license = "Apache-2.0"
-defaultTargets = ["Mqtt", "Proofs", "mqtt"]
+defaultTargets = ["Mqtt", "MqttSpec", "MqttProofs", "mqtt"]
 
 [[lean_lib]]
 name = "Mqtt"
 
 [[lean_lib]]
-name = "Proofs"
+name = "MqttSpec"
+roots = ["Mqtt.Spec"]
 
 [[lean_lib]]
-name = "Spec"
+name = "MqttProofs"
+roots = ["Mqtt.Proofs"]
 
 [[lean_exe]]
 name = "mqtt"

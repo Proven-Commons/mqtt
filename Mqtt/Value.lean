@@ -479,7 +479,7 @@ def print (p : Packet) : List UInt8 :=
 
 /-! ## Well formed values
 
-  The round trip claim in `Proofs` holds for well formed
+  The round trip claim in `Mqtt.Proofs` holds for well formed
   packets: the fields the printer can write exactly. Numbers
   fit the widths that carry them, strings obey the string
   rules, properties match the table in type and place and do

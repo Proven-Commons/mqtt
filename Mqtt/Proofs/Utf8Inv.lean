@@ -1,13 +1,13 @@
 /-
   The other direction of the strict UTF-8 codec: what the decoder
   accepts is the encoding of the text it returns. Together with
-  `Mqtt.Utf8.Proofs.decode_encode` in `Proofs/Utf8.lean`, the
+  `Mqtt.Utf8.Proofs.decode_encode` in `Mqtt/Proofs/Utf8.lean`, the
   decoder is exactly the inverse of the encoder. The packet
-  reader's soundness (`Proofs/Sound.lean`) rests on it for every
+  reader's soundness (`Mqtt/Proofs/Sound.lean`) rests on it for every
   string field.
 -/
 
-import Proofs.Utf8
+import Mqtt.Proofs.Utf8
 
 namespace Mqtt.Utf8.Proofs
 

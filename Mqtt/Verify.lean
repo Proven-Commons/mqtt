@@ -8,8 +8,8 @@
   a proof rests on an admitted gap, and the claim is not proved.
 -/
 
-import Proofs
-import Proofs.Examples
+import Mqtt.Proofs
+import Mqtt.Proofs.Examples
 
 open Mqtt.Proofs Mqtt.Examples
 

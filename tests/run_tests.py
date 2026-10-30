@@ -784,7 +784,7 @@ def fixed_cases():
         bytes([192, 0]), want_ok(bytes([192, 0])))
 
     # One hand built packet per type; the literal ones are the
-    # same bytes proved in Proofs/Examples.lean.
+    # same bytes proved in Mqtt/Proofs/Examples.lean.
     add("pingreq", bytes([192, 0]))
     add("pingresp", bytes([208, 0]))
     add("disconnect empty", bytes([224, 0]))

@@ -12,7 +12,7 @@ spec_authors = ["abu-aska", "zero-aska"]
 entry_points = ["Main.lean"]
 
 [spec]
-files = ["SPEC.md", "Spec.lean", "Spec/Defs.lean"]
+files = ["SPEC.md", "Mqtt/Spec.lean", "Mqtt/Spec/Defs.lean"]
 # The code under proof: the functions the statements are about.
 code = [
   # The data types the statements are about, and their constructors.
@@ -25,7 +25,7 @@ code = [
   "Mqtt.Packet.publish", "Mqtt.Packet.subscribe", "Mqtt.Packet.suback",
   "Mqtt.Packet.pingreq", "Mqtt.Packet.pingresp", "Mqtt.Packet.disconnect",
   # The fields, constructors and match recursors of those types that
-  # the rules in Spec/Defs.lean read.
+  # the rules in Mqtt/Spec/Defs.lean read.
   "Mqtt.Property.id", "Mqtt.Property.val", "Mqtt.PropVal.rec",
   "Mqtt.PropVal.ctorIdx", "Mqtt.PropSet.connect", "Mqtt.PropSet.will",
   "Mqtt.PropSet.publish", "Mqtt.PropSet.subscribe", "Mqtt.PropSet.suback",

@@ -1,16 +1,16 @@
 /-
-  Proofs of the statements in `Spec.lean` whose rule text stands
-  in `Spec/Defs.lean`, part of the specification.
+  Proofs of the statements in `Mqtt/Spec.lean` whose rule text stands
+  in `Mqtt/Spec/Defs.lean`, part of the specification.
 
   Each proof starts from what the reader is already proved to
-  accept (`parsePacket_inv` in `Proofs/Sound.lean`, and
-  `decVBI_canonical` in `Proofs/RoundTrip.lean`) and shows that the
+  accept (`parsePacket_inv` in `Mqtt/Proofs/Sound.lean`, and
+  `decVBI_canonical` in `Mqtt/Proofs/RoundTrip.lean`) and shows that the
   rule written in the specification holds for it.
 -/
 
 import Mqtt
-import Spec.Defs
-import Proofs.Sound
+import Mqtt.Spec.Defs
+import Mqtt.Proofs.Sound
 
 namespace Mqtt.Proofs
 
@@ -18,11 +18,11 @@ open Mqtt
 
 /-! ## The byte count of a variable byte integer -/
 
-/-- The printer writes a value below 2^28 in `Spec.vbiSize`
+/-- The printer writes a value below 2^28 in `Mqtt.Spec.vbiSize`
     bytes. -/
 theorem printVBI_length (n : Nat) (hn : n < 268435456) :
-    (printVBI n).length = Spec.vbiSize n := by
-  unfold Spec.vbiSize
+    (printVBI n).length = Mqtt.Spec.vbiSize n := by
+  unfold Mqtt.Spec.vbiSize
   rw [printVBI_def]
   by_cases h1 : n < 128
   · simp [h1]
@@ -38,10 +38,10 @@ theorem printVBI_length (n : Nat) (hn : n < 268435456) :
   rfl
 
 /-- What the variable byte integer reader accepts takes exactly
-    `Spec.vbiSize` bytes of its value: it is the printer's
+    `Mqtt.Spec.vbiSize` bytes of its value: it is the printer's
     writing (`decVBI_canonical`), whose length is that count. -/
 theorem decVBI_length (bs : List UInt8) (n : Nat) (r : List UInt8)
-    (h : decVBI bs = some (n, r)) : bs.length = r.length + Spec.vbiSize n := by
+    (h : decVBI bs = some (n, r)) : bs.length = r.length + Mqtt.Spec.vbiSize n := by
   obtain ⟨hn, he⟩ := decVBI_canonical bs n r h
   rw [he, List.length_append, printVBI_length n hn, Nat.add_comm]
 
@@ -67,7 +67,7 @@ theorem parse_iff (bs : List UInt8) (p : Packet) :
 theorem pubHeader_mem (dup retain : Bool) (qos : Nat) (hq : qos ≤ 2)
     (hd : qos = 0 → dup = false) :
     (0x30 + (if dup then 8 else 0) + qos * 2 + (if retain then 1 else 0)).toUInt8
-      ∈ Spec.headerBytes := by
+      ∈ Mqtt.Spec.headerBytes := by
   have : qos = 0 ∨ qos = 1 ∨ qos = 2 := by omega
   rcases this with rfl | rfl | rfl
   · rw [hd rfl]; cases retain <;> decide
@@ -75,24 +75,24 @@ theorem pubHeader_mem (dup retain : Bool) (qos : Nat) (hq : qos ≤ 2)
   · cases dup <;> cases retain <;> decide
 
 /-- The printer's header byte of a well formed packet is on the
-    list `Spec.headerBytes`. -/
-theorem header_mem (p : Packet) (h : PacketWF p) : headerOf p ∈ Spec.headerBytes := by
+    list `Mqtt.Spec.headerBytes`. -/
+theorem header_mem (p : Packet) (h : PacketWF p) : headerOf p ∈ Mqtt.Spec.headerBytes := by
   cases p with
   | publish m =>
     obtain ⟨hq, -, -, -, -, hd⟩ := (h.1 : PublishWF m)
     exact pubHeader_mem m.dup m.retain m.qos hq hd
-  | connect c => show (0x10 : UInt8) ∈ Spec.headerBytes; decide
-  | subscribe => show (0x82 : UInt8) ∈ Spec.headerBytes; decide
-  | suback => show (0x90 : UInt8) ∈ Spec.headerBytes; decide
+  | connect c => show (0x10 : UInt8) ∈ Mqtt.Spec.headerBytes; decide
+  | subscribe => show (0x82 : UInt8) ∈ Mqtt.Spec.headerBytes; decide
+  | suback => show (0x90 : UInt8) ∈ Mqtt.Spec.headerBytes; decide
   | pingreq => decide
   | pingresp => decide
-  | disconnect => show (0xE0 : UInt8) ∈ Spec.headerBytes; decide
+  | disconnect => show (0xE0 : UInt8) ∈ Mqtt.Spec.headerBytes; decide
 
 /-- What the stream reader takes starts with a header byte on
     the list: it is a printing (`parsePacket_inv`). -/
 theorem header_rule (bs : List UInt8) (p : Packet) (r : List UInt8)
     (h : parsePacket bs = some (p, r)) :
-    ∃ b tl, bs = b :: tl ∧ b ∈ Spec.headerBytes := by
+    ∃ b tl, bs = b :: tl ∧ b ∈ Mqtt.Spec.headerBytes := by
   obtain ⟨hwf, he⟩ := parsePacket_inv bs p r h
   refine ⟨headerOf p, (printVBI (bodyOf p).length ++ bodyOf p) ++ r, ?_, header_mem p hwf⟩
   rw [he]; rfl
@@ -119,8 +119,8 @@ theorem connect_rule (bs r : List UInt8) (c : Connect)
     (h : parsePacket bs = some (.connect c, r)) :
     (∃ (f : UInt8) (tail : List UInt8),
       bs = 16 :: (printVBI (8 + tail.length) ++ ([0, 4, 77, 81, 84, 84, 5, f] ++ tail)) ++ r
-      ∧ Spec.ConnectFlagsRule f.toNat)
-    ∧ ∀ w, c.will = some w → w.topic ≠ [] ∧ Spec.TopicNameRule w.topic := by
+      ∧ Mqtt.Spec.ConnectFlagsRule f.toNat)
+    ∧ ∀ w, c.will = some w → w.topic ≠ [] ∧ Mqtt.Spec.TopicNameRule w.topic := by
   obtain ⟨hwf, he⟩ := parsePacket_inv bs _ r h
   have hc : ConnectWF c := hwf.1
   obtain ⟨f1, f2, f3, -, -, -, f7, -, f9⟩ := connectFlags_facts c hc
@@ -171,7 +171,7 @@ theorem hasTopicAlias_true {ps : List Property} (h : hasTopicAlias ps = true) :
     `PublishWF` gives the topic and identifier rules. -/
 theorem publish_rule (bs r : List UInt8) (m : Publish)
     (h : parsePacket bs = some (.publish m, r)) :
-    Spec.TopicNameRule m.topic ∧ (m.topic = [] → ∃ q ∈ m.props, q.id = 0x23)
+    Mqtt.Spec.TopicNameRule m.topic ∧ (m.topic = [] → ∃ q ∈ m.props, q.id = 0x23)
     ∧ (m.packetId = none ↔ m.qos = 0) ∧ (∀ i, m.packetId = some i → i ≠ 0) := by
   obtain ⟨hwf, -⟩ := parsePacket_inv bs _ r h
   obtain ⟨hq, ht, hid, hnone, -, -⟩ := (hwf.1 : PublishWF m)
@@ -230,10 +230,10 @@ theorem propsWF_count : ∀ (s : PropSet) (seen : List Nat) (ps : List Property)
         simp [this, ih2]
 
 /-- The table type and `propValOK` of an allowed identifier give
-    `Spec.ValueRule`, by cases on the identifier. -/
+    `Mqtt.Spec.ValueRule`, by cases on the identifier. -/
 theorem valueRule_of (s : PropSet) (q : Property) (h1 : q.id ∈ allowedOf s)
     (h2 : propTypeOf q.id = some (valType q.val)) (h3 : propValOK q.id q.val = true) :
-    Spec.ValueRule q.id q.val := by
+    Mqtt.Spec.ValueRule q.id q.val := by
   obtain ⟨i, v⟩ := q
   dsimp only at h1 h2 h3 ⊢
   have hi : i = 0x01 ∨ i = 0x02 ∨ i = 0x03 ∨ i = 0x08 ∨ i = 0x09 ∨ i = 0x0B ∨ i = 0x11
@@ -243,11 +243,11 @@ theorem valueRule_of (s : PropSet) (q : Property) (h1 : q.id ∈ allowedOf s)
   rcases hi with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
     | rfl | rfl | rfl | rfl | rfl | rfl | rfl
   all_goals
-    cases v <;> simp_all [propTypeOf, valType, propValOK, Spec.ValueRule, Spec.TopicNameRule]
+    cases v <;> simp_all [propTypeOf, valType, propValOK, Mqtt.Spec.ValueRule, Mqtt.Spec.TopicNameRule]
 
-/-- A well formed property block keeps `Spec.BlockRule`. -/
+/-- A well formed property block keeps `Mqtt.Spec.BlockRule`. -/
 theorem blockRule_of_wf (s : PropSet) (ps : List Property) (h : PropsBlockWF s ps) :
-    Spec.BlockRule s ps := by
+    Mqtt.Spec.BlockRule s ps := by
   obtain ⟨hw, -, ha⟩ := h
   refine ⟨?_, ?_, ?_⟩
   · intro q hq
@@ -256,7 +256,7 @@ theorem blockRule_of_wf (s : PropSet) (ps : List Property) (h : PropsBlockWF s p
     cases s <;> exact h1
   · intro i hi
     have : repeatableIn s i = false := by
-      unfold Spec.MayRepeat at hi
+      unfold Mqtt.Spec.MayRepeat at hi
       unfold repeatableIn
       cases s <;> simp_all
     exact (propsWF_count s [] ps hw i this).2
@@ -270,16 +270,16 @@ theorem blockRule_of_wf (s : PropSet) (ps : List Property) (h : PropsBlockWF s p
     exact ⟨q', hq', by simpa using he'⟩
 
 /-- Every block of a packet the stream reader takes is well
-    formed, so it keeps `Spec.BlockRule`. -/
+    formed, so it keeps `Mqtt.Spec.BlockRule`. -/
 theorem property_rule (bs r : List UInt8) (p : Packet)
     (h : parsePacket bs = some (p, r)) :
-    ∀ b ∈ Spec.blocks p, Spec.BlockRule b.1 b.2 := by
+    ∀ b ∈ Mqtt.Spec.blocks p, Mqtt.Spec.BlockRule b.1 b.2 := by
   obtain ⟨hwf, -⟩ := parsePacket_inv bs p r h
   intro b hb
   cases p with
   | connect c =>
     have hc : ConnectWF c := hwf.1
-    simp only [Spec.blocks] at hb
+    simp only [Mqtt.Spec.blocks] at hb
     rcases List.mem_cons.mp hb with rfl | hb
     · exact blockRule_of_wf _ _ hc.2.1
     · cases hw : c.will with
@@ -337,8 +337,8 @@ theorem levelOK_facts {l : List Char} (h : levelOK l = true) :
   · exact ⟨fun _ => rfl, by simp⟩
   · exact ⟨fun hm => absurd hm h2, h1⟩
 
-/-- Levels that pass `levelsOK` keep `Spec.WildcardRule`. -/
-theorem wildcardRule_of : ∀ ls : List (List Char), levelsOK ls = true → Spec.WildcardRule ls
+/-- Levels that pass `levelsOK` keep `Mqtt.Spec.WildcardRule`. -/
+theorem wildcardRule_of : ∀ ls : List (List Char), levelsOK ls = true → Mqtt.Spec.WildcardRule ls
   | [], _ => fun i hi => absurd hi (by simp)
   | [l], h => by
     intro i hi
@@ -366,8 +366,8 @@ theorem wildcardRule_of : ∀ ls : List (List Char), levelsOK ls = true → Spec
       exact ⟨h1, fun hm => ⟨(h2 hm).1, by have := (h2 hm).2; omega⟩⟩
 
 /-- A filter that passes `plainFilterOK` keeps
-    `Spec.PlainFilterRule`. -/
-theorem plainRule_of (f : List Char) (h : plainFilterOK f = true) : Spec.PlainFilterRule f := by
+    `Mqtt.Spec.PlainFilterRule`. -/
+theorem plainRule_of (f : List Char) (h : plainFilterOK f = true) : Mqtt.Spec.PlainFilterRule f := by
   unfold plainFilterOK at h
   simp only [Bool.and_eq_true, Bool.not_eq_true', List.isEmpty_eq_false_iff] at h
   exact ⟨h.1, by rw [← splitLevels_eq]; exact wildcardRule_of _ h.2⟩
@@ -395,10 +395,10 @@ theorem shareSplit_some : ∀ (r name flt : List Char),
         simp only [List.mem_cons, not_or]
         exact ⟨fun e => hc e.symm, h2⟩
 
-/-- A filter that passes `filterOK` keeps `Spec.FilterRule`. -/
+/-- A filter that passes `filterOK` keeps `Mqtt.Spec.FilterRule`. -/
 theorem filterRule_of (f : List Char) (o : SubOpts) (h : filterOK f o = true) :
-    Spec.FilterRule f o := by
-  by_cases hp : Spec.sharePrefix <+: f
+    Mqtt.Spec.FilterRule f o := by
+  by_cases hp : Mqtt.Spec.sharePrefix <+: f
   · obtain ⟨r, rfl⟩ := hp
     refine ⟨fun _ => ?_, fun hn => absurd (List.prefix_append _ _) hn⟩
     have h' : (match shareSplit r with
@@ -425,9 +425,9 @@ theorem filterRule_of (f : List Char) (o : SubOpts) (h : filterOK f o = true) :
     · exact plainRule_of f h
 
 /-- Every filter of a well formed filter list keeps
-    `Spec.FilterRule`. -/
+    `Mqtt.Spec.FilterRule`. -/
 theorem filtersWF_rule : ∀ (fs : List (List Char × SubOpts)), FiltersWF fs →
-    ∀ fo ∈ fs, Spec.FilterRule fo.1 fo.2
+    ∀ fo ∈ fs, Mqtt.Spec.FilterRule fo.1 fo.2
   | [], _, fo, hfo => by cases hfo
   | (f, o) :: gs, h, fo, hfo => by
     obtain ⟨-, -, hok, hrest⟩ := h
@@ -439,7 +439,7 @@ theorem filtersWF_rule : ∀ (fs : List (List Char × SubOpts)), FiltersWF fs �
     identifier, filter list and filters keep the rules. -/
 theorem subscribe_rule (bs r : List UInt8) (i : Nat) (ps : List Property)
     (fs : List (List Char × SubOpts)) (h : parsePacket bs = some (.subscribe i ps fs, r)) :
-    i ≠ 0 ∧ fs ≠ [] ∧ ∀ fo ∈ fs, Spec.FilterRule fo.1 fo.2 := by
+    i ≠ 0 ∧ fs ≠ [] ∧ ∀ fo ∈ fs, Mqtt.Spec.FilterRule fo.1 fo.2 := by
   obtain ⟨hwf, -⟩ := parsePacket_inv bs _ r h
   obtain ⟨h1, -, -, h4, h5⟩ := hwf.1
   exact ⟨by omega, h4, filtersWF_rule fs h5⟩

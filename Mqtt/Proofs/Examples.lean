@@ -9,7 +9,7 @@
 
   The examples are stated on the reading side. The round trip
   and soundness theorems cover the printer in general, and
-  `Spec.disconnect_short_form` evaluates it on two packets.
+  `Mqtt.Spec.disconnect_short_form` evaluates it on two packets.
 -/
 
 import Mqtt

@@ -1,8 +1,8 @@
 /-
-  Definitions the statements in `Spec.lean` use besides the code
+  Definitions the statements in `Mqtt/Spec.lean` use besides the code
   under proof.
 
-  This file is part of the specification, with `Spec.lean` and
+  This file is part of the specification, with `Mqtt/Spec.lean` and
   `SPEC.md`: `bar.toml` lists it among the spec files, so an
   approval covers its text. Each definition here is written from
   the MQTT 5.0 standard (OASIS Standard, 7 March 2019; section
@@ -14,7 +14,7 @@
 
 import Mqtt
 
-namespace Spec
+namespace Mqtt.Spec
 
 open Mqtt
 
@@ -185,4 +185,4 @@ def FilterRule (f : List Char) (o : SubOpts) : Prop :=
       ∧ PlainFilterRule flt ∧ o.noLocal = false)
   ∧ (¬ sharePrefix <+: f → PlainFilterRule f)
 
-end Spec
+end Mqtt.Spec

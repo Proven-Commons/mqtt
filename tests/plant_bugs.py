@@ -11,7 +11,7 @@ to catch. For each one, in a scratch copy of the repo, the script:
    tests when the harness reports a failure.
 2. builds everything (`lake build`), the proofs included. The
    plant is caught by the proofs when that build fails: the proofs
-   of the approved statements in Spec.lean no longer go through.
+   of the approved statements in Mqtt/Spec.lean no longer go through.
    For a planted bug that makes a statement false, no proof can
    go through. The script reports the first error.
 
@@ -43,69 +43,69 @@ ROOT = os.path.dirname(HERE)
 #  input is the witness: the planted reader accepts it, and the
 #  statement says no reader that meets it does.
 PLANTS = [
-    ("cap5", "Spec.decVBI_four_byte_cap",
+    ("cap5", "Mqtt.Spec.decVBI_four_byte_cap",
      "variable byte integers may take five bytes",
      "Mqtt/Parse.lean", "  decVBIGo 4 bs", "  decVBIGo 5 bs"),
-    ("longer_writings", "Spec.decVBI_length",
+    ("longer_writings", "Mqtt.Spec.decVBI_length",
      "a variable byte integer written in more bytes than needed is "
      "accepted (128, 0 for 0)",
      "Mqtt/Parse.lean",
      "| some (v, r) => if v = 0 then none else some",
      "| some (v, r) => if v = 0 ∧ False then none else some"),
-    ("zero_padding", "Spec.parse_sound",
+    ("zero_padding", "Mqtt.Spec.parse_sound",
      "a field cut short by the end of the input is padded with zero "
      "bytes",
      "Mqtt/Parse.lean",
      "  if bs.length ≥ n then some (bs.take n, bs.drop n) else none",
      "  some ((bs ++ List.replicate n 0).take n, bs.drop n)"),
-    ("subscribe_flags", "Spec.header_rule",
+    ("subscribe_flags", "Mqtt.Spec.header_rule",
      "a SUBSCRIBE with flags 0000 is accepted as well as 0010",
      "Mqtt/Parse.lean",
      "  | 8 => if flags = 2 then readSubscribeBody seg else none",
      "  | 8 => if flags = 2 ∨ flags = 0 then readSubscribeBody seg else none"),
-    ("dup_qos0", "Spec.header_rule",
+    ("dup_qos0", "Mqtt.Spec.header_rule",
      "a PUBLISH with DUP set at QoS 0 is accepted",
      "Mqtt/Parse.lean",
      "else if (flags / 2) % 4 = 0 ∧ flagBit flags 3 = true then none",
      "else if False then none"),
-    ("will_bits", "Spec.connect_rule",
+    ("will_bits", "Mqtt.Spec.connect_rule",
      "will QoS and will retain bits are accepted with the will flag "
      "clear",
      "Mqtt/Parse.lean",
      "if flagBit flags 2 || (flags / 8) % 8 = 0 then", "if true then"),
-    ("empty_topic", "Spec.publish_rule",
+    ("empty_topic", "Mqtt.Spec.publish_rule",
      "an empty PUBLISH topic is accepted without a Topic Alias",
      "Mqtt/Parse.lean",
      "  if topic.isEmpty && !hasTopicAlias props then none",
      "  if false then none"),
-    ("disconnect_form", "Spec.disconnect_short_form",
+    ("disconnect_form", "Mqtt.Spec.disconnect_short_form",
      "the one byte DISCONNECT body is read as the long form",
      "Mqtt/Parse.lean",
      "if r1.isEmpty then some (.disconnect (some (rc.toNat, none)))",
      "if r1.isEmpty then some (.disconnect (some (rc.toNat, some [])))"),
-    ("filters_unchecked", "Spec.subscribe_rule",
+    ("filters_unchecked", "Mqtt.Spec.subscribe_rule",
      "SUBSCRIBE topic filters are not checked at all",
      "Mqtt/Parse.lean", "          if filterOK f o then",
      "          if true then"),
-    ("filter_partial", "Spec.subscribe_rule",
+    ("filter_partial", "Mqtt.Spec.subscribe_rule",
      "a # level is accepted before the last level when three or more "
      "levels follow it (a/#/b/c/d)",
      "Mqtt/Value.lean", "  | l :: ls => levelOK l && levelsOK ls",
      "  | l :: ls => (levelOK l || (l == ['#'] && 3 ≤ ls.length)) "
      "&& levelsOK ls"),
-    ("value_partial", "Spec.property_rule",
+    ("value_partial", "Mqtt.Spec.property_rule",
      "Request Problem Information 3 is accepted",
      "Mqtt/Value.lean", "  | 0x17, .byte n => n ≤ 1\n",
      "  | 0x17, .byte n => n ≤ 1 || n = 3\n"),
-    ("subid_zero", "Spec.property_rule",
+    ("subid_zero", "Mqtt.Spec.property_rule",
      "a Subscription Identifier of 0 is accepted",
      "Mqtt/Value.lean", "  | 0x0B, .varByte n => n != 0\n", ""),
-    ("response_topic_hash", "Spec.property_rule",
+    ("response_topic_hash", "Mqtt.Spec.property_rule",
      "a Response Topic holding # is accepted (+ is still refused)",
      "Mqtt/Value.lean",
      "  | 0x08, .utf8 s => !s.isEmpty && !s.contains '+' && !s.contains '#'",
      "  | 0x08, .utf8 s => !s.isEmpty && !s.contains '+'"),
-    ("auth_unchecked", "Spec.property_rule",
+    ("auth_unchecked", "Mqtt.Spec.property_rule",
      "Authentication Data is accepted without a Method",
      "Mqtt/Value.lean",
      "  !(ps.any fun p => p.id == 0x16) || ps.any fun p => p.id == 0x15",

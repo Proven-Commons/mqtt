@@ -4,7 +4,7 @@
   `Mqtt.Proofs.parse_inv`, for the whole input reader, and
   `Mqtt.Proofs.parsePacket_inv`, for the stream reader.
 
-  Together with the round trip in `Proofs/RoundTrip.lean`, this
+  Together with the round trip in `Mqtt/Proofs/RoundTrip.lean`, this
   makes the reader and the printer exact inverses between well
   formed packets and the byte lists the reader accepts: a byte
   list is accepted if and only if it is the printing of a well
@@ -14,8 +14,8 @@
   it returns, and the field is well formed".
 -/
 
-import Proofs.RoundTrip
-import Proofs.Utf8Inv
+import Mqtt.Proofs.RoundTrip
+import Mqtt.Proofs.Utf8Inv
 
 namespace Mqtt.Proofs
 
